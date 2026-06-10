@@ -1,0 +1,34 @@
+# ── Dependencies ──
+node_modules/
+.pnpm-store/
+
+# ── Build output ──
+dist/
+dist-web/
+coverage/
+
+# ── Generated output directories ──
+output-*/
+uploads/
+
+# ── Temporary reports ──
+reports/tmp/
+*.log
+
+# ── Environment files ──
+.env
+.env.*
+!.env.example
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── Cache ──
+.cache/
+.vite/
+.turbo/
+
+# ── IDE / tools ──
+.codegraph/
+.reasonix/

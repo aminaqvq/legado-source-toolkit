@@ -1,0 +1,367 @@
+[
+  {
+    "bookSourceName": "🚖 米国度",
+    "bookSourceUrl": "https://www.miguodu.com",
+    "bookSourceGroup": "小说",
+    "bookSourceType": 0,
+    "searchUrl": "https://www.miguodu.com/search?keyword={{key}}",
+    "ruleSearch": {
+      "bookList": "class.book-list",
+      "name": "h3.title",
+      "author": "span.author",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1",
+      "author": "span.author"
+    },
+    "ruleToc": {
+      "chapterList": "ul.chapter-list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div.content"
+    },
+    "enabled": true,
+    "respondTime": 1200,
+    "lastUpdateTime": 1734567890000,
+    "weight": 1000
+  },
+  {
+    "bookSourceName": "🎧 UAA有声",
+    "bookSourceUrl": "https://www.uaa-audio.com",
+    "bookSourceGroup": "有声",
+    "bookSourceType": 1,
+    "searchUrl": "https://www.uaa-audio.com/search?q={{key}}",
+    "ruleSearch": {
+      "bookList": "div.result-list div",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div.audio-content"
+    },
+    "enabled": true,
+    "respondTime": 800,
+    "lastUpdateTime": 1734567890000,
+    "weight": 800
+  },
+  {
+    "bookSourceName": "🎨再漫画💓",
+    "bookSourceUrl": "https://www.zaimanhua.com",
+    "bookSourceGroup": "漫画",
+    "bookSourceType": 2,
+    "searchUrl": "https://www.zaimanhua.com/search?keyword={{key}}",
+    "ruleSearch": {
+      "bookList": "div.comic-list",
+      "name": "h3.title",
+      "author": "span.author",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1",
+      "author": "span.author"
+    },
+    "ruleToc": {
+      "chapterList": "ul.chapter-list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div.comic-content",
+      "sourceRegex": "img"
+    },
+    "enabled": true,
+    "respondTime": 1500,
+    "lastUpdateTime": 1734567890000,
+    "weight": 900
+  },
+  {
+    "bookSourceName": "❤️笔趣阁新站@遇知",
+    "bookSourceUrl": "https://www.biqiku.com",
+    "bookSourceGroup": "小说",
+    "bookSourceType": 0,
+    "searchUrl": "https://www.biqiku.com/search?keyword={{key}}",
+    "ruleSearch": {
+      "bookList": "div.result-list",
+      "name": "h3.title",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1",
+      "author": "span.author"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div#content"
+    },
+    "enabled": true,
+    "respondTime": 900,
+    "lastUpdateTime": 1734567890000,
+    "weight": 1200
+  },
+  {
+    "bookSourceName": "猫眼看书（优++）",
+    "bookSourceUrl": "https://www.maoyanbook.com",
+    "bookSourceGroup": "小说",
+    "bookSourceType": 0,
+    "searchUrl": "https://www.maoyanbook.com/search?q={{key}}",
+    "ruleSearch": {
+      "bookList": "div.result-list div.item",
+      "name": "h3.title",
+      "author": "span.author",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1",
+      "author": "span.author"
+    },
+    "ruleToc": {
+      "chapterList": "ul.chapter-list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div#content"
+    },
+    "enabled": true,
+    "respondTime": 600,
+    "lastUpdateTime": 1734567890000,
+    "weight": 1500
+  },
+  {
+    "bookSourceName": "漫蛙",
+    "bookSourceUrl": "https://www.manwa.com",
+    "bookSourceGroup": "漫画",
+    "bookSourceType": 2,
+    "searchUrl": "https://www.manwa.com/search?keyword={{key}}",
+    "ruleSearch": {
+      "bookList": "div.comic-list",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div.content img"
+    },
+    "enabled": true,
+    "respondTime": 2000,
+    "lastUpdateTime": 1734567890000,
+    "weight": 700
+  },
+  {
+    "bookSourceName": "刚够小说网",
+    "bookSourceUrl": "https://www.gangoubook.com",
+    "bookSourceGroup": "小说",
+    "bookSourceType": 0,
+    "searchUrl": "https://www.gangoubook.com/search/{{key}}",
+    "ruleSearch": {
+      "bookList": "div.result-list div",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div#chapter-content"
+    },
+    "enabled": true,
+    "respondTime": 1100,
+    "lastUpdateTime": 1734567890000,
+    "weight": 600
+  },
+  {
+    "bookSourceName": "笔趣阁新站",
+    "bookSourceUrl": "https://m.biqiku.com",
+    "bookSourceGroup": "小说",
+    "bookSourceType": 0,
+    "searchUrl": "https://m.biqiku.com/search?keyword={{key}}",
+    "ruleSearch": {
+      "bookList": "div.result-list",
+      "name": "h3.title",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1",
+      "author": "span.author"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div#content"
+    },
+    "enabled": true,
+    "respondTime": 2500,
+    "lastUpdateTime": 1700000000000,
+    "weight": 500
+  },
+  {
+    "bookSourceName": "✨失效站✨",
+    "bookSourceUrl": "https://dead-site-12345.com",
+    "bookSourceGroup": "小说",
+    "bookSourceType": 0,
+    "searchUrl": "https://dead-site-12345.com/search/{{key}}",
+    "ruleSearch": {
+      "bookList": "div.list",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleContent": {
+      "content": "div.content"
+    },
+    "enabled": false,
+    "respondTime": 50000,
+    "lastUpdateTime": 1600000000000,
+    "weight": 100
+  },
+  {
+    "bookSourceName": "复杂JS源",
+    "bookSourceUrl": "https://www.complex-test.com",
+    "bookSourceGroup": "测试",
+    "bookSourceType": 0,
+    "searchUrl": "<js>java.ajax('https://api.test.com/search')</js>",
+    "ruleSearch": {
+      "bookList": "div.list",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div#content"
+    },
+    "enabled": true,
+    "respondTime": 3000,
+    "lastUpdateTime": 1734567890000,
+    "weight": 300
+  },
+  {
+    "bookSourceName": "非HTTP标识源",
+    "bookSourceUrl": "custom-source-identifier",
+    "bookSourceGroup": "自定义",
+    "bookSourceType": 0,
+    "searchUrl": "https://example.com/search/{{key}}",
+    "ruleSearch": {
+      "bookList": "div.list",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div.content"
+    },
+    "enabled": true,
+    "respondTime": 0,
+    "weight": 200
+  },
+  {
+    "bookSourceName": "喜马拉雅FM有声",
+    "bookSourceUrl": "https://www.ximalaya-fake.com",
+    "bookSourceGroup": "有声",
+    "bookSourceType": 1,
+    "searchUrl": "https://www.ximalaya-fake.com/search?keyword={{key}}",
+    "ruleSearch": {
+      "bookList": "div.sound-list",
+      "name": "span.title",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1.title"
+    },
+    "ruleToc": {
+      "chapterList": "ul.sound-list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "div.sound-player"
+    },
+    "enabled": true,
+    "enabledExplore": true,
+    "respondTime": 2000,
+    "lastUpdateTime": 1734567890000,
+    "weight": 5000
+  },
+  {
+    "bookSourceName": "影视天堂",
+    "bookSourceUrl": "https://www.movietest.com",
+    "bookSourceGroup": "影视",
+    "bookSourceType": 3,
+    "searchUrl": "https://www.movietest.com/search?q={{key}}",
+    "ruleSearch": {
+      "bookList": "div.video-list",
+      "name": "h3",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.episode-list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "video source",
+      "sourceRegex": "m3u8"
+    },
+    "enabled": true,
+    "respondTime": 1800,
+    "weight": 400
+  },
+  {
+    "bookSourceName": "EPUB下载站",
+    "bookSourceUrl": "https://www.epub-download.com",
+    "bookSourceGroup": "下载",
+    "bookSourceType": 3,
+    "searchUrl": "https://www.epub-download.com/search/{{key}}",
+    "ruleSearch": {
+      "bookList": "div.file-list",
+      "name": "span.filename",
+      "bookUrl": "a@href"
+    },
+    "ruleBookInfo": {
+      "name": "h1"
+    },
+    "ruleToc": {
+      "chapterList": "ul.file-list li",
+      "chapterName": "a"
+    },
+    "ruleContent": {
+      "content": "a.download-link"
+    },
+    "enabled": true,
+    "respondTime": 4000,
+    "weight": 300
+  }
+]
