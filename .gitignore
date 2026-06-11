@@ -19,6 +19,7 @@ reports/tmp/
 .env
 .env.*
 !.env.example
+.idea
 
 # ── OS files ──
 .DS_Store
