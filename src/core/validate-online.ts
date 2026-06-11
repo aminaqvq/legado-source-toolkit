@@ -56,12 +56,14 @@ export async function isSafeURL(urlStr: string, allowPrivate: boolean): Promise<
     if (hostname === 'localhost' || hostname.endsWith('.local')) {
       return { safe: allowPrivate, error: 'localhost/private hostname blocked' };
     }
-    const addrs = await dns.lookup(hostname, { all: true }).catch(() => null);
-    if (addrs) {
-      for (const addr of addrs) {
-        if (isPrivateIP(addr.address)) {
-          return { safe: allowPrivate, error: `Private IP ${addr.address} blocked for ${hostname}` };
-        }
+    const [v4, v6] = await Promise.all([
+      dns.resolve4(hostname).catch(() => [] as string[]),
+      dns.resolve6(hostname).catch(() => [] as string[]),
+    ]);
+    const addrs = [...v4.map(a => ({ address: a })), ...v6.map(a => ({ address: a }))];
+    for (const addr of addrs) {
+      if (isPrivateIP(addr.address)) {
+        return { safe: allowPrivate, error: `Private IP ${addr.address} blocked for ${hostname}` };
       }
     }
     return { safe: true };
