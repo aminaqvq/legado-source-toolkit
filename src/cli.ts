@@ -16,7 +16,7 @@ const program = new Command();
 program
   .name('ls-tk')
   .description('Legado Source Toolkit — 书源 JSON 清洗、校验、分类、去重工具')
-  .version('1.0.0');
+  .version('1.2.0');
 
 // ── process ──
 program

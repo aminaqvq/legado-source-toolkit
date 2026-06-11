@@ -83,7 +83,7 @@ await app.register(multipart, { limits: { fileSize: 100 * 1024 * 1024 } });
 // API routes
 app.get('/api/health', async () => ({
   success: true,
-  data: { status: 'ok', version: '1.0.0' },
+  data: { status: 'ok', version: '1.2.0' },
 }));
 
 registerInspectRoutes(app);

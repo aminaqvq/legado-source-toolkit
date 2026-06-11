@@ -10,15 +10,13 @@ coverage/
 # ── Generated output directories ──
 output-*/
 uploads/
-
-# ── Temporary reports ──
-reports/tmp/
-*.log
+reports/
 
 # ── Environment files ──
 .env
 .env.*
 !.env.example
+*.log
 .idea
 
 # ── OS files ──
@@ -33,3 +31,4 @@ Thumbs.db
 # ── IDE / tools ──
 .codegraph/
 .reasonix/
+reasonix.toml

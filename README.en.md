@@ -613,4 +613,4 @@ MIT License — see [LICENSE](./LICENSE) file.
 
 ---
 
-*Legado Source Toolkit v1.0.0 — Built with TypeScript, Fastify, React, and Vite*
+*Legado Source Toolkit v1.2.0 — Built with TypeScript, Fastify, React, and Vite*
