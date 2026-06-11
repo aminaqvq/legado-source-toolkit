@@ -1,56 +1,61 @@
 @echo off
-chcp 65001 >nul
-setlocal enabledelayedexpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
 cd /d "%~dp0"
 
-title Legado Source Toolkit GUI
+title Legado Source Toolkit Dev Launcher
 
 echo ========================================
-echo   Legado Source Toolkit GUI
+echo   Legado Source Toolkit Dev Launcher
 echo ========================================
 echo.
 
-:: ── Check Node.js ──
+rem Check Node.js
 where node >nul 2>nul
 if errorlevel 1 (
-    echo [ERROR] Node.js not found. Please install Node.js 20+ from:
-    echo   https://nodejs.org/
+    echo [ERROR] Node.js not found. Please install Node.js 20+.
+    echo https://nodejs.org/
     echo.
     pause
     exit /b 1
 )
-for /f "delims=" %%v in ('node -v') do set NODE_VER=%%v
+
+for /f "delims=" %%v in ('node -v') do set "NODE_VER=%%v"
 echo [OK] Node.js %NODE_VER%
 
-:: ── Check pnpm ──
-where pnpm >nul 2>nul
+rem Check pnpm.cmd
+where pnpm.cmd >nul 2>nul
 if errorlevel 1 (
-    echo [INFO] pnpm not found. Trying to enable Corepack...
-    corepack enable >nul 2>nul
+    echo [INFO] pnpm.cmd not found. Trying to enable Corepack...
+    call corepack enable >nul 2>nul
 )
-where pnpm >nul 2>nul
+
+where pnpm.cmd >nul 2>nul
 if errorlevel 1 (
-    echo [ERROR] pnpm not found. Please install pnpm:
-    echo   npm install -g pnpm
-    echo   or enable Corepack: corepack enable
+    echo [ERROR] pnpm.cmd not found.
+    echo Please install pnpm:
+    echo npm install -g pnpm
+    echo.
+    echo Or enable Corepack:
+    echo corepack enable
     echo.
     pause
     exit /b 1
 )
-for /f "delims=" %%v in ('pnpm -v') do set PNPM_VER=%%v
+
+for /f "delims=" %%v in ('pnpm.cmd -v') do set "PNPM_VER=%%v"
 echo [OK] pnpm %PNPM_VER%
 
-:: ── Check node_modules ──
+rem Check dependencies
 if not exist "node_modules\" (
     echo.
-    echo [INFO] Dependencies not installed (node_modules not found).
-    echo.
-    set /p INSTALL_DEPS=Install dependencies now? [Y/N]:
+    echo [INFO] Dependencies not installed.
+    set /p "INSTALL_DEPS=Install dependencies now? [Y/N]: "
+
     if /i "!INSTALL_DEPS!"=="Y" (
         echo.
         echo [INFO] Installing dependencies...
-        call pnpm install
+        call pnpm.cmd install
         if errorlevel 1 (
             echo [ERROR] pnpm install failed.
             pause
@@ -64,24 +69,37 @@ if not exist "node_modules\" (
     )
 )
 
-:: ── Start GUI ──
 echo.
-echo [INFO] Starting GUI...
-echo [INFO] Backend API: http://127.0.0.1:5178
-echo [INFO] API Health:  http://127.0.0.1:5178/api/health
-echo.
-echo       Opening browser in a few seconds...
-echo       Keep this window open while using the tool.
+echo [INFO] Starting backend API...
+echo [INFO] Backend:    http://127.0.0.1:5178
+echo [INFO] API Health: http://127.0.0.1:5178/api/health
 echo.
 
-:: Delay before opening browser (allow server to boot)
-timeout /t 3 /nobreak >nul
-start "" http://127.0.0.1:5178
+start "LS-Toolkit Backend API" cmd /k "cd /d "%~dp0" && pnpm.cmd gui"
 
-:: Launch the server (foreground — blocks here)
-call pnpm gui
-
-:: If server stops, pause so user sees the output
+echo [INFO] Starting Web UI...
+echo [INFO] Web UI:     http://127.0.0.1:5173
 echo.
-echo [INFO] Server has stopped.
+
+start "LS-Toolkit Web UI" cmd /k "cd /d "%~dp0" && pnpm.cmd web:dev"
+
+echo [INFO] Opening browser...
+timeout /t 5 /nobreak >nul
+start "" http://127.0.0.1:5173
+
+echo.
+echo ========================================
+echo   LS-Toolkit started in development mode
+echo ========================================
+echo.
+echo Web UI:     http://127.0.0.1:5173
+echo Backend:    http://127.0.0.1:5178
+echo API Health: http://127.0.0.1:5178/api/health
+echo.
+echo Two command windows were opened:
+echo - LS-Toolkit Backend API
+echo - LS-Toolkit Web UI
+echo.
+echo Close those windows to stop the services.
+echo.
 pause
