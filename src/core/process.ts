@@ -26,12 +26,19 @@ import path from 'node:path';
  * Main processing pipeline.
  */
 export async function processSources(options: ProcessOptions): Promise<ProcessReport> {
+  const log = (msg: string) => { options.onLog?.(msg); };
+  const setPhase = (phase: string) => { options.onPhaseChange?.(phase); };
+
   heading('Legado Source Toolkit — Processing');
+  log('▶ 开始处理');
 
   // ═══ Step 1: Read and parse ═══
+  setPhase('读取输入文件');
   info('Reading input file...');
+  log('正在读取输入文件...');
   const { sources, analyses } = readBookSources(options.inputPath);
   info(`Found ${sources.length} book source(s)`);
+  log(`✓ 找到 ${sources.length} 个书源`);
 
   if (sources.length === 0) {
     warn('Input file contains no sources. Exiting.');
@@ -52,9 +59,10 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
       filterCount++;
     }
   }
-  if (filterCount > 0) info(`Filtered ${filterCount} source(s) via input options`);
+  if (filterCount > 0) { info(`Filtered ${filterCount} source(s) via input options`); log(`✓ 过滤 ${filterCount} 个源（来源选项）`); }
 
   // ═══ Step 2: Clean names ═══
+  setPhase('名称清洗');
   heading('Phase 1/6: Name cleaning');
   for (let i = 0; i < analyses.length; i++) {
     const result = cleanBookSourceName(sources[i].bookSourceName ?? '', {
@@ -68,8 +76,10 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
     analyses[i].warnings.push(...result.warnings);
   }
   success(`Names cleaned (mode: ${options.nameMode})`);
+  log(`✓ 名称清洗完成 (模式: ${options.nameMode})`);
 
   // ═══ Step 3: Normalize URLs ═══
+  setPhase('URL 规范化');
   heading('Phase 2/6: URL normalization');
   for (let i = 0; i < analyses.length; i++) {
     const norm = normalizeUrl(sources[i].bookSourceUrl);
@@ -79,8 +89,7 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
     analyses[i].urlWarnings = norm.urlWarnings;
   }
   success('URLs normalized');
-
-  // ═══ Step 3b: Non-HTTP filter (MUST run after URL normalization so urlStatus is set) ═══
+  log('✓ URL 规范化完成');
   if (!options.includeNonHttp) {
     let nhCount = 0;
     for (let i = 0; i < analyses.length; i++) {
@@ -94,6 +103,7 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
   }
 
   // ═══ Step 4: Classify ═══
+  setPhase('分类');
   heading('Phase 3/6: Classification');
   for (let i = 0; i < analyses.length; i++) {
     const cls = classifySource(sources[i], analyses[i]);
@@ -103,8 +113,10 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
     analyses[i].classificationSignals = cls.signals;
   }
   success('Sources classified');
+  log('✓ 分类完成');
 
   // ═══ Step 5: Validate structure (category-aware) ═══
+  setPhase('结构校验');
   heading('Phase 4/6: Structure validation');
   for (let i = 0; i < analyses.length; i++) {
     const struct = validateStructure(sources[i], analyses[i].inferredGroup);
@@ -120,14 +132,17 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
   const invalidCount = analyses.filter((a) => a.validationStatus === 'STRUCTURE_INVALID').length;
   const warnCount = analyses.filter((a) => a.validationStatus === 'STRUCTURE_WARN').length;
   success(`Structure validated: ${analyses.length - invalidCount - warnCount} OK, ${warnCount} warnings, ${invalidCount} invalid`);
+  log(`✓ 结构校验完成: ${analyses.length - invalidCount - warnCount} OK, ${warnCount} 警告, ${invalidCount} 无效`);
 
   // ═══ Step 6: Online validation (if enabled) ═══
   if (options.online) {
+    setPhase('在线验证');
     heading('Phase 5/6: Online validation');
     const limit = pLimit(options.concurrency);
 
     // 6a: Connectivity check
     info('Checking connectivity...');
+    let connDone = 0;
     const connectivityTasks = analyses.map((analysis, i) =>
       limit(async () => {
         const result = await checkConnectivity(sources[i], {
@@ -140,14 +155,18 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
           analysis.measuredRespondTime = result.responseTimeMs;
         }
         if (result.headerStatus) analysis.headerStatus = result.headerStatus;
-        progress(i + 1, analyses.length, 'Connectivity');
+        connDone++;
+        options.onProgress?.('connectivity', connDone, analyses.length);
+        progress(connDone, analyses.length, 'Connectivity');
       }),
     );
     await Promise.all(connectivityTasks);
     success('Connectivity checks complete');
+    log('✓ 连通性检查完成');
 
     // 6b: Search validation
     info('Checking search...');
+    let searchDone = 0;
     const searchTasks = analyses.map((analysis, i) =>
       limit(async () => {
         const result = await checkSearchUrl(sources[i], analysis.inferredGroup, {
@@ -155,13 +174,17 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
         });
         analysis.searchStatus = result.status;
         analysis.searchDetail = result.detail;
-        progress(i + 1, analyses.length, 'Search');
+        searchDone++;
+        options.onProgress?.('search', searchDone, analyses.length);
+        progress(searchDone, analyses.length, 'Search');
       }),
     );
     await Promise.all(searchTasks);
     success('Search checks complete');
+    log('✓ 搜索验证完成');
   } else {
     info('Online validation skipped (use --online to enable)');
+    log('⊘ 在线验证跳过 (未启用)');
   }
 
   // ═══ Compute login-related status ═══
@@ -183,6 +206,7 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
   }
 
   // ═══ Step 7: Score ═══
+  setPhase('评分');
   heading('Phase 6/6: Scoring & Deduplication');
   for (let i = 0; i < analyses.length; i++) {
     const result = calculateScore(sources[i], analyses[i]);
@@ -190,8 +214,10 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
     analyses[i].scoreBreakdown = result.breakdown;
   }
   success('Scores calculated');
+  log('✓ 评分计算完成');
 
   // ═══ Step 8: Deduplicate ═══
+  setPhase('去重');
   const dedupeResult = dedupeSources(sources, analyses, {
     level: options.dedupeLevel,
     allowRiskyDedupe: options.allowRiskyDedupe,
@@ -201,8 +227,10 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
   }
   const removedCount = analyses.filter((a) => !a.kept).length;
   success(`Deduplication complete: ${removedCount} removed (level: ${options.dedupeLevel})`);
+  log(`✓ 去重完成: 移除 ${removedCount} 个 (级别: ${options.dedupeLevel})`);
 
   // ═══ Step 9: Apply group mode ═══
+  log('应用分组模式...');
   for (let i = 0; i < analyses.length; i++) {
     const orig = sources[i].bookSourceGroup || '';
     const inferred = analyses[i].inferredGroup;
@@ -304,10 +332,13 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
 
   if (options.dryRun) {
     info('Dry run — skipping file output.');
+    log('⊘ 试运行模式 — 跳过文件输出');
     return report;
   }
 
   // ═══ Step 12: Write output files ═══
+  setPhase('输出写入');
+  log('正在写入输出文件...');
   ensureOutputDir(options.outDir);
 
   // 1. cleaned-sources.json (only kept + availability-filtered)
@@ -393,6 +424,7 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
     }
   } else {
     success('Output consistency: all checks passed');
+    log('✓ 输出一致性检查: 全部通过');
   }
 
   // ── Console summary ──
@@ -410,6 +442,7 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
   keyValue('Avg respond time (src)', `${summary.input.averageRespondTime}ms`);
 
   success(`Output written to: ${options.outDir}`);
+  log(`✓ 输出完成: 输入 ${summary.input.total} → 输出 ${summary.output.total}`);
 
   return report;
 }

@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SourceTable from '../components/SourceTable';
 import JsonViewer from '../components/JsonViewer';
 import StatusBadge from '../components/StatusBadge';
 import { getResultDir, getSourceDetail } from '../lib/api-client';
+import { useAppStore } from '../store/AppContext';
+import { normalizeDisplayDir } from '../utils/dirs';
 
 export default function SourcesPage() {
-  const [dir, setDir] = useState('output-verify');
+  const store = useAppStore();
+  const activeDir = normalizeDisplayDir(store.activeResultDir);
+  const [dir, setDir] = useState(activeDir || '');
   const [sources, setSources] = useState<Record<string,unknown>[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -13,7 +17,12 @@ export default function SourcesPage() {
   const [detailTab, setDetailTab] = useState<'json'|'steps'|'signals'|'score'>('json');
   const [filters, setFilters] = useState({ search: '', cat: '', avail: '', kept: '' });
 
+  useEffect(() => { if (activeDir && !dir) setDir(activeDir); }, [activeDir]);
+
+  const useCurrent = () => { if (activeDir) { setDir(activeDir); } };
+
   const load = async () => {
+    if (!dir) return;
     setLoading(true); setError('');
     try {
       const res = await getResultDir(dir);
@@ -23,6 +32,8 @@ export default function SourcesPage() {
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
+
+  useEffect(() => { load(); }, [dir]);
 
   const loadDetail = async (s: Record<string,unknown>) => {
     try {
@@ -48,8 +59,11 @@ export default function SourcesPage() {
     <div className="page">
       <h2>📋 书源列表</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input value={dir} onChange={e => setDir(e.target.value)} placeholder="output-verify" style={{ width: 140 }} />
-        <button onClick={load} disabled={loading}>{loading ? '加载中...' : '加载'}</button>
+        <input value={dir} onChange={e => setDir(e.target.value)} placeholder={activeDir || '结果目录'} style={{ width: 140 }} />
+        <button onClick={load} disabled={loading || !dir}>{loading ? '加载中...' : '加载'}</button>
+        {activeDir && activeDir !== dir && (
+          <button onClick={useCurrent} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>▶ 使用当前结果</button>
+        )}
         <input value={filters.search} onChange={e => setFilters(f => ({...f, search: e.target.value}))} placeholder="搜索名称/URL" style={{ width: 160 }} />
         <select value={filters.cat} onChange={e => setFilters(f => ({...f, cat: e.target.value}))}>
           <option value="">全部分类</option>
@@ -66,6 +80,20 @@ export default function SourcesPage() {
         </select>
       </div>
       {error && <div className="error">{error}</div>}
+      {!loading && !dir && (
+        <div className="empty-hint" style={{ color: '#888', marginTop: 12 }}>
+          📭 请先在处理运行页执行一次处理，结果目录会自动填到这里。
+        </div>
+      )}
+      {loading && <div className="loading-hint">加载中...</div>}
+      {!loading && dir && filtered.length === 0 && sources.length > 0 && (
+        <div className="empty-hint" style={{ color: '#888', marginTop: 12 }}>没有匹配的源</div>
+      )}
+      {!loading && dir && sources.length === 0 && !error && (
+        <div className="empty-hint" style={{ color: '#f59e0b', marginTop: 12 }}>
+          ⚠️ 目录 <code>{dir}</code> 中没有数据。请检查目录是否存在且已生成报告。
+        </div>
+      )}
 
       <SourceTable sources={filtered} onSelect={loadDetail} loading={loading} />
 

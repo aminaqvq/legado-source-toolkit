@@ -1,30 +1,46 @@
 import { useState, useEffect } from 'react';
 import { getConsistency } from '../lib/api-client';
+import { useAppStore } from '../store/AppContext';
+import { normalizeDisplayDir } from '../utils/dirs';
 import type { ConsistencyReport, ConsistencyCheck } from '../lib/api-types';
 
 export default function ConsistencyPage() {
-  const [dir, setDir] = useState('output-verify');
+  const store = useAppStore();
+  const activeDir = normalizeDisplayDir(store.activeResultDir);
+  const [dir, setDir] = useState(activeDir || '');
   const [data, setData] = useState<ConsistencyReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  useEffect(() => { if (activeDir && !dir) setDir(activeDir); }, [activeDir]);
+  const useCurrent = () => { if (activeDir) { setDir(activeDir); } };
+
   const load = async () => {
+    if (!dir) return;
     setLoading(true); setError('');
     try { setData(await getConsistency(dir)); }
     catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [dir]);
 
   return (
     <div className="page">
       <h2>✅ 验收中心</h2>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-        <input value={dir} onChange={e => setDir(e.target.value)} style={{ width: 140 }} />
-        <button onClick={load} disabled={loading}>{loading ? '加载中...' : '刷新'}</button>
+        <input value={dir} onChange={e => setDir(e.target.value)} placeholder={activeDir || '结果目录'} style={{ width: 140 }} />
+        <button onClick={load} disabled={loading || !dir}>{loading ? '加载中...' : '刷新'}</button>
+        {activeDir && activeDir !== dir && (
+          <button onClick={useCurrent} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>▶ 使用当前结果</button>
+        )}
       </div>
       {error && <div className="error">{error}</div>}
+      {!dir && !loading && (
+        <div className="empty-hint" style={{ color: '#888', marginTop: 12 }}>
+          📭 请先在处理运行页执行处理，结果目录会自动填到这里。
+        </div>
+      )}
 
       {data && (
         <>

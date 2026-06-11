@@ -61,7 +61,7 @@ export function registerValidateRoutes(app: FastifyInstance): void {
       // Online validation
       if (body.online) {
         const pLimit = (await import('p-limit')).default;
-        const limit = pLimit(body.concurrency || 5);
+        const limit = pLimit(body.concurrency || 16);
         const timeout = body.timeout || 8000;
 
         // Connectivity

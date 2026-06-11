@@ -1,7 +1,7 @@
 import type {
   HealthData, InspectData, JobStatus, ProcessFormOptions,
   ProcessSummary, ConsistencyReport, IssuesData, SourceAnalysisItem,
-  UploadResult, ResultsListEntry,
+  UploadResult, UploadPreview, ResultsListEntry,
 } from './api-types';
 
 const API_BASE = '/api';
@@ -36,7 +36,7 @@ export async function inspect(inputPath: string): Promise<InspectData> {
   return post('/inspect', { inputPath });
 }
 export async function validate(
-  inputPath: string, online = false, concurrency = 5, timeout = 8000,
+  inputPath: string, online = false, concurrency = 16, timeout = 8000,
 ): Promise<{ total: number; ok: number; warn: number; invalid: number }> {
   return post('/validate', { inputPath, online, concurrency, timeout });
 }
@@ -75,6 +75,11 @@ export async function getIssues(outDir: string): Promise<IssuesData> {
 }
 export async function getSourceDetail(index: number, outDir: string): Promise<SourceAnalysisItem> {
   return get(`/results/source/${index}?dir=${encodeURIComponent(outDir)}`);
+}
+
+// ── Upload preview ──
+export async function previewUpload(uploadId: string, limit = 5): Promise<UploadPreview> {
+  return get(`/uploads/preview?uploadId=${encodeURIComponent(uploadId)}&limit=${limit}`);
 }
 
 // ── Download ──

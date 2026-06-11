@@ -38,8 +38,19 @@ export function registerProcessRoutes(app: FastifyInstance): void {
       });
     }
 
+    // Get relative display dir from the user-provided value
+    const displayDir = (() => {
+      const raw = body.outDir || 'output-ui';
+      const cleaned = raw.replace(/\\/g, '/').replace(/^\/+/, '').replace(/^\.\//, '');
+      const first = cleaned.split('/')[0];
+      return first || 'output-ui';
+    })();
+
     const jobId = crypto.randomUUID();
     jobStore.create(jobId);
+    jobStore.setInputPath(jobId, safeInputPath);
+    jobStore.setResultDir(jobId, safeOutDir);
+    jobStore.setDisplayResultDir(jobId, displayDir);
 
     // Run async — don't await
     processSources({
@@ -49,7 +60,7 @@ export function registerProcessRoutes(app: FastifyInstance): void {
       dedupeLevel: body.dedupeLevel ?? 'conservative',
       groupMode: body.groupMode ?? 'category-first',
       nameMode: body.nameMode ?? 'loose',
-      concurrency: body.concurrency ?? 5,
+      concurrency: body.concurrency ?? 16,
       timeout: body.timeout ?? 8000,
       retry: body.retry ?? 1,
       dryRun: body.dryRun ?? false,
@@ -65,6 +76,10 @@ export function registerProcessRoutes(app: FastifyInstance): void {
       includeUnavailable: body.includeUnavailable ?? false,
       writeNormalizedUrl: body.writeNormalizedUrl ?? false,
       strict: body.strict ?? false,
+      // ── GUI progress callbacks ──
+      onPhaseChange: (phase: string) => jobStore.setPhase(jobId, phase),
+      onLog: (message: string) => jobStore.addLog(jobId, message),
+      onProgress: (label, done, total) => jobStore.updateProgress(jobId, label, done, total),
     })
       .then((report) => {
         jobStore.complete(jobId, report);

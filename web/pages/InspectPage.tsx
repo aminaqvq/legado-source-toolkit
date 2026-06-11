@@ -2,15 +2,21 @@ import { useState } from 'react';
 import FilePicker from '../components/FilePicker';
 import StatCard from '../components/StatCard';
 import { inspect } from '../lib/api-client';
+import { useAppStore } from '../store/AppContext';
 import type { InspectData } from '../lib/api-types';
 
 export default function InspectPage() {
-  const [inputPath, setInputPath] = useState('./bookSource.json');
+  const store = useAppStore();
+  const { upload, setUpload } = store;
+  const inputPath = upload.filePath || '';
+  const setInputPath = (path: string) => setUpload({ filePath: path, uploaded: true });
+
   const [data, setData] = useState<InspectData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const run = async () => {
+    if (!inputPath) return;
     setLoading(true); setError('');
     try { setData(await inspect(inputPath)); } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
@@ -20,7 +26,14 @@ export default function InspectPage() {
     <div className="page">
       <h2>🔍 概览审查</h2>
       <FilePicker value={inputPath} onChange={setInputPath} />
-      <button onClick={run} disabled={loading} style={{ marginTop: 12 }}>
+
+      {!inputPath && (
+        <div className="empty-hint" style={{ marginTop: 8, color: '#888', fontSize: '0.85rem' }}>
+          ℹ️ 请先在上传书源页选择文件，或输入本地 JSON 文件路径。
+        </div>
+      )}
+
+      <button onClick={run} disabled={loading || !inputPath} style={{ marginTop: 12 }}>
         {loading ? '检查中...' : '开始检查'}
       </button>
       {error && <div className="error">{error}</div>}

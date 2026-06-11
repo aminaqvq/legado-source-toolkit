@@ -29,7 +29,7 @@ program
   .option('--dedupe <level>', '去重级别: none | exact | url | conservative | host | aggressive', 'conservative')
   .option('--group-mode <mode>', '分组写入模式: overwrite | append | preserve | category-first | report-only', 'category-first')
   .option('--name-mode <mode>', '名称清洗模式: zh-only | loose', 'loose')
-  .option('--concurrency <n>', '并发数', '5')
+  .option('--concurrency <n>', '并发数', '16')
   .option('--timeout <ms>', '请求超时毫秒', '8000')
   .option('--retry <n>', '重试次数', '1')
   .option('--dry-run', '试运行，不写入文件', false)
@@ -64,7 +64,7 @@ program
       nameMode: (['zh-only', 'loose'] as const).includes(nameMode as never)
         ? nameMode as never
         : 'loose',
-      concurrency: parseInt(String(options.concurrency), 10) || 5,
+      concurrency: parseInt(String(options.concurrency), 10) || 16,
       timeout: parseInt(String(options.timeout), 10) || 8000,
       retry: parseInt(String(options.retry), 10) || 1,
       dryRun: Boolean(options.dryRun),
@@ -167,7 +167,7 @@ program
   .description('仅校验书源（不清洗、不去重）')
   .argument('<input>', '输入 JSON 文件路径')
   .option('--online', '启用在线校验', false)
-  .option('--concurrency <n>', '并发数', '5')
+  .option('--concurrency <n>', '并发数', '16')
   .option('--timeout <ms>', '超时毫秒', '8000')
   .action(async (input: string, _options: Record<string, string | boolean>) => {
     heading('Validating book sources');

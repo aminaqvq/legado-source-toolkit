@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { saveUpload, listUploads, clearUploads } from '../services/upload-store.js';
+import { saveUpload, listUploads, clearUploads, getUploadedFile } from '../services/upload-store.js';
 import fs from 'fs-extra';
 import path from 'node:path';
 
@@ -13,7 +13,6 @@ function isPathSafe(fileParam: string): { safe: boolean; resolved?: string; erro
   const resolved = path.resolve(fileParam);
   const cwd = process.cwd();
 
-  // Check the resolved path is under an allowed directory
   for (const root of ALLOWED_ROOTS) {
     const allowedBase = path.join(cwd, root);
     const rel = path.relative(allowedBase, resolved);
@@ -22,7 +21,6 @@ function isPathSafe(fileParam: string): { safe: boolean; resolved?: string; erro
     }
   }
 
-  // Also allow if the first component is explicitly an allowed root name
   const parts = fileParam.replace(/\\/g, '/').split('/').filter(Boolean);
   if (parts.length > 0 && ALLOWED_ROOTS.includes(parts[0])) {
     const allowedBase = path.join(cwd, parts[0]);
@@ -35,8 +33,15 @@ function isPathSafe(fileParam: string): { safe: boolean; resolved?: string; erro
   return { safe: false, error: '不允许下载该路径文件 (仅限输出目录)' };
 }
 
+function clamp(n: number, min: number, max: number): number {
+  if (Number.isNaN(n)) return min;
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
 export function registerFilesRoutes(app: FastifyInstance): void {
-  // Upload file — security hardened
+  // ── Upload file ──
   app.post('/api/upload', async (request, reply) => {
     const data = await request.file();
     if (!data) {
@@ -46,7 +51,6 @@ export function registerFilesRoutes(app: FastifyInstance): void {
       });
     }
 
-    // Only allow .json files
     const ext = path.extname(data.filename).toLowerCase();
     if (ext !== '.json') {
       return reply.status(400).send({
@@ -55,7 +59,6 @@ export function registerFilesRoutes(app: FastifyInstance): void {
       });
     }
 
-    // Size limit: 50MB
     const MAX_SIZE = 50 * 1024 * 1024;
     const buffer = await data.toBuffer();
     if (buffer.length > MAX_SIZE) {
@@ -65,7 +68,6 @@ export function registerFilesRoutes(app: FastifyInstance): void {
       });
     }
 
-    // Validate content is valid JSON
     try {
       JSON.parse(buffer.toString('utf-8'));
     } catch {
@@ -75,19 +77,120 @@ export function registerFilesRoutes(app: FastifyInstance): void {
       });
     }
 
-    const filePath = await saveUpload(data.filename, buffer);
-    const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
-    return { success: true, data: { path: relPath, name: data.filename, size: buffer.length } };
+    const meta = await saveUpload(data.filename, buffer);
+    return {
+      success: true,
+      data: {
+        uploadId: meta.uploadId,
+        path: meta.relPath,
+        name: meta.fileName,
+        size: meta.size,
+      },
+    };
   });
 
-  // List uploads
+  // ── List uploads ──
   app.get('/api/uploads', async () => {
     const files = await listUploads();
     const relFiles = files.map(f => path.relative(process.cwd(), f).replace(/\\/g, '/'));
     return { success: true, data: { files: relFiles } };
   });
 
-  // Download a result file — path-traversal hardened
+  // ── Preview uploaded file (first N items) ──
+  app.get('/api/uploads/preview', async (request, reply) => {
+    const { uploadId, limit: limitRaw } = request.query as { uploadId?: string; limit?: string };
+    const limit = clamp(Number(limitRaw) || 5, 1, 50);
+
+    if (!uploadId || typeof uploadId !== 'string') {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'INVALID_REQUEST', message: '请提供 uploadId' },
+      });
+    }
+
+    const meta = getUploadedFile(uploadId);
+    if (!meta) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'UPLOAD_EXPIRED', message: '上传记录已失效，请重新上传' },
+      });
+    }
+
+    // ── Secondary path validation ──
+    const uploadsDir = path.resolve('uploads');
+    const resolved = path.resolve(meta.absPath);
+    const rel = path.relative(uploadsDir, resolved);
+    if (rel.startsWith('..') || path.isAbsolute(rel)) {
+      return reply.status(403).send({
+        success: false,
+        error: { code: 'FORBIDDEN', message: '不允许访问该文件' },
+      });
+    }
+    if (!resolved.toLowerCase().endsWith('.json')) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'INVALID_TYPE', message: '只允许预览 JSON 文件' },
+      });
+    }
+    try {
+      const real = fs.realpathSync(resolved);
+      const realRel = path.relative(uploadsDir, real);
+      if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
+        return reply.status(403).send({
+          success: false,
+          error: { code: 'FORBIDDEN', message: '不允许访问该文件' },
+        });
+      }
+    } catch {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '文件不存在，请重新上传' },
+      });
+    }
+
+    if (!(await fs.pathExists(resolved))) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'NOT_FOUND', message: '文件不存在，请重新上传' },
+      });
+    }
+
+    // ── Read and validate JSON ──
+    let parsed: unknown;
+    try {
+      const raw = await fs.readFile(resolved, 'utf-8');
+      parsed = JSON.parse(raw);
+    } catch {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'INVALID_JSON', message: '文件不是有效的 JSON' },
+      });
+    }
+
+    if (!Array.isArray(parsed)) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'NOT_ARRAY', message: '文件不是 JSON 数组' },
+      });
+    }
+
+    const count = parsed.length;
+    const preview = parsed.slice(0, limit);
+
+    return {
+      success: true,
+      data: {
+        uploadId: meta.uploadId,
+        fileName: meta.fileName,
+        path: meta.relPath,
+        count,
+        limit,
+        preview,
+      },
+    };
+  });
+
+  // ── Download a result file ──
   app.get('/api/download', async (request, reply) => {
     const { file } = request.query as { file?: string };
     const check = isPathSafe(file ?? '');
@@ -111,7 +214,7 @@ export function registerFilesRoutes(app: FastifyInstance): void {
       .send(fs.createReadStream(check.resolved));
   });
 
-  // Clear uploads
+  // ── Clear uploads ──
   app.delete('/api/uploads', async () => {
     await clearUploads();
     return { success: true, data: { message: '已清理' } };

@@ -35,6 +35,16 @@ export interface JobStatus {
   completedAt?: string;
   result?: unknown;
   error?: string;
+  // ── Structured progress ──
+  logs?: string[];
+  phase?: string;
+  totalProgress?: number;
+  phaseProgress?: number;
+  connProgress?: { done: number; total: number; percent: number };
+  searchProgress?: { done: number; total: number; percent: number };
+  resultDir?: string;
+  displayResultDir?: string;
+  inputPath?: string;
 }
 
 // ── Process options ──
@@ -220,9 +230,19 @@ export interface SourceAnalysisItem {
 // ── Upload ──
 
 export interface UploadResult {
+  uploadId: string;
   path: string;
   name: string;
   size: number;
+}
+
+export interface UploadPreview {
+  uploadId: string;
+  fileName: string;
+  path: string;
+  count: number;
+  limit: number;
+  preview: Record<string, unknown>[];
 }
 
 // ── Results list ──

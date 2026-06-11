@@ -1,5 +1,6 @@
 import { Component, useState, useEffect, type ReactNode, type ErrorInfo } from 'react';
 import { healthCheck } from './lib/api-client';
+import { AppProvider, useAppStore } from './store/AppContext';
 import DashboardPage from './pages/DashboardPage';
 import UploadPage from './pages/UploadPage';
 import InspectPage from './pages/InspectPage';
@@ -56,6 +57,8 @@ function App() {
 
   const nav = (page: Page) => setCurrentPage(page);
 
+  const store = useAppStore();
+
   return (
     <div className="app">
       <nav className="sidebar">
@@ -69,6 +72,10 @@ function App() {
             {item.icon} {item.label}
           </button>
         ))}
+        <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--border, #333)' }}>
+          <button style={{ fontSize: '0.75rem', opacity: 0.6, background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: '4px 8px' }}
+            onClick={store.resetSession}>🗑 重置状态</button>
+        </div>
       </nav>
       <main className="content">
         {currentPage === 'dashboard' && <DashboardPage onNavigate={(p: string) => nav(p as Page)} />}
@@ -88,5 +95,11 @@ function App() {
 }
 
 export default function AppWithBoundary() {
-  return <ErrorBoundary><App /></ErrorBoundary>;
+  return (
+    <ErrorBoundary>
+      <AppProvider>
+        <App />
+      </AppProvider>
+    </ErrorBoundary>
+  );
 }

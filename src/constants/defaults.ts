@@ -3,7 +3,7 @@ import type { CategoryLabel, NameMode } from '../types/book-source.js';
 // ── Online check defaults ──
 
 export const DEFAULT_TIMEOUT = 8000;
-export const DEFAULT_CONCURRENCY = 5;
+export const DEFAULT_CONCURRENCY = 16;
 export const DEFAULT_RETRY = 1;
 
 // ── Default search keywords per category ──

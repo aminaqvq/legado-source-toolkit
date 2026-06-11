@@ -219,4 +219,9 @@ export interface ProcessOptions {
   includeUnavailable: boolean;
   writeNormalizedUrl: boolean;
   strict: boolean;
+
+  // GUI progress callbacks (optional, for live Web UI updates)
+  onPhaseChange?: (phase: string) => void;
+  onLog?: (message: string) => void;
+  onProgress?: (label: 'connectivity' | 'search', done: number, total: number) => void;
 }

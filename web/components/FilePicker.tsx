@@ -1,14 +1,15 @@
 import { useState, useRef } from 'react';
 import { uploadFile, inspect } from '../lib/api-client';
-import type { InspectData } from '../lib/api-types';
+import type { InspectData, UploadResult } from '../lib/api-types';
 
 interface Props {
   value: string;
   onChange: (path: string) => void;
   onInspect?: (data: InspectData) => void;
+  onUpload?: (res: UploadResult) => void;
 }
 
-export default function FilePicker({ value, onChange, onInspect }: Props) {
+export default function FilePicker({ value, onChange, onInspect, onUpload }: Props) {
   const [uploading, setUploading] = useState(false);
   const [fileInfo, setFileInfo] = useState<{ name: string; size: number } | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -22,6 +23,7 @@ export default function FilePicker({ value, onChange, onInspect }: Props) {
       const result = await uploadFile(file);
       setFileInfo({ name: result.name, size: result.size });
       onChange(result.path);
+      if (onUpload) onUpload(result);
       if (onInspect) {
         try {
           const data = await inspect(result.path);
