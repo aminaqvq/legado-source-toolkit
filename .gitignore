@@ -8,7 +8,7 @@ dist-web/
 coverage/
 
 # ── Generated output directories ──
-output-*/
+output-*
 uploads/
 reports/
 
