@@ -543,36 +543,6 @@ GitHub Actions CI automatically runs: typecheck → lint → build → web:build
 
 ---
 
-## Pre-publish Checklist for GitHub
-
-```bash
-# 1. Run full verification
-pnpm verify
-
-# 2. Check git status
-git status
-```
-
-Confirm the following are NOT committed (`.gitignore` handles them):
-
-| Pattern | Description |
-|---------|-------------|
-| `node_modules/` | Dependencies |
-| `.pnpm-store/` | pnpm store cache |
-| `dist/` | Backend build output |
-| `dist-web/` | Frontend build output |
-| `coverage/` | Test coverage reports |
-| `output-*/` | Runtime output directories |
-| `uploads/` | Uploaded files |
-| `.env` / `.env.*` | Environment files (`.env.example` is kept) |
-| `*.log` | Log files |
-| `.cache/` / `.vite/` | Cache files |
-| `.codegraph/` / `.reasonix/` | IDE / tool configs |
-
-> The project does not commit `dist/` or `dist-web/`. Users must build after cloning.
-
----
-
 ## FAQ
 
 **Q: Why do I see "Web UI has not been built" when I open port 5178?**
