@@ -81,3 +81,35 @@ The Single Source Lab (`verifyAllRules` / Web GUI "单源调试") provides deepe
 - Redirect chains with SSRF protection
 - Content length validation (detecting too-short responses)
 - Structured error classification and suggestions
+
+---
+
+## Batch Deep Validate Limitations (v1.6)
+
+The Batch Deep Validate mode applies the Single Source Lab's chain verification to multiple sources in batch. Additional limitations apply:
+
+### Performance Concerns
+
+| Concern | Mitigation |
+|---------|------------|
+| **deep mode: 4 requests per source** | Default concurrency is 8 (recommended: 4 for deep). Each source triggers search → bookInfo → toc → content HTTP requests. |
+| **Target site pressure** | Verify fewer sources or use standard (3 requests) or fast (0 extra requests) modes. Avoid running deep on hundreds of sources at once. |
+| **Network timeouts accumulate** | Each request has an 8-second default timeout. With 4 stages, a single broken source may block for up to 32 seconds in worst case. |
+
+### Mode-Specific Behavior
+
+| Mode | Rule engine calls | HTTP requests per source | Use case |
+|------|-------------------|--------------------------|----------|
+| **fast** | None | 0 additional (reuses existing connectivity/search) | Quick health check, large collections |
+| **standard** | search + bookInfo + toc | 3 (search, bookInfo page, TOC page) | Verify discovery → detail → chapter list |
+| **deep** | full chain | 4 (adds content page) | Full end-to-end validation |
+
+### Reporting
+
+- HTML / Web UI show summary cards and failure distribution only — per-stage details require using the Debug page per source
+- CSV contains summary fields only (mode, status, first failure, reasons, warnings, durationMs)
+- JSON `sources.json` includes batchValidationStatus and related summary fields — full `stageResults` are not written by default
+
+### Same Runtime Limitations Apply
+
+All v1.5 Single Source Lab limitations apply equally to batch validation: no Browser Runner, no Android Runner, no Rhino compatibility, no `java.ajax` execution, no login handling, no Cloudflare bypass, no `webView:true`.

@@ -1,6 +1,6 @@
 {
   "name": "legado-source-toolkit",
-  "version": "1.5.0-rc.1",
+  "version": "1.6.0-rc.1",
   "description": "A local toolkit for cleaning, validating, classifying, and deduplicating Legado (开源阅读) book source JSON exports",
   "type": "module",
   "bin": {

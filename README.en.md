@@ -88,7 +88,7 @@ Single-source debugging is accessed through the **Web GUI** "🐛 Single Source 
 | `java.ajax` | Not executed in safe mode |
 | `java.getCookie` | Not supported |
 | `Packages.*` | Not supported |
-| Rhino compatibility | Not fully simulated |
+| Rhino compatibility | Not supported; Node vm sandbox only |
 | Login flow | Not handled |
 | Cloudflare / CAPTCHA | No bypass attempted |
 | Complex Legado-specific syntax | May require manual review |
@@ -96,6 +96,63 @@ Single-source debugging is accessed through the **Web GUI** "🐛 Single Source 
 ### Correct Positioning
 
 > v1.5 is not a full replacement for the Legado Android runtime. It is an automated validation tool for batch maintenance and single-source debugging. It is designed to catch structural errors, connection failures, rule breakage, and obviously broken sources — then defer complex sources for manual review.
+
+---
+
+## v1.6 Batch Deep Validate
+
+v1.6 extends v1.5's single-source validation chain into the batch processing pipeline, supporting batch deep validation across multiple sources.
+
+### Three Validation Modes
+
+| Mode | Description | What It Does |
+|------|-------------|--------------|
+| **fast** | Quick summary mode, explicitly enabled with `--validate-mode fast` | structure + connectivity + lightweight search URL only. No rule engine. |
+| **standard** | Standard depth | search → bookInfo → toc (stops at TOC, no content requests) |
+| **deep** | Full depth | search → bookInfo → toc → content (complete chain) |
+
+### Usage
+
+```bash
+# Standard mode: search → bookInfo → toc
+pnpm dev process samples/sample.json --online --validate-mode standard --batch-concurrency 8
+
+# Deep mode: full chain (use with caution)
+pnpm dev process samples/sample.json --online --validate-mode deep --batch-concurrency 4
+```
+
+> ⚠️ **deep mode** sends 4 requests per source (search / bookInfo / toc / content). Use low concurrency (default 8, recommended 4) to avoid pressure on target sites.
+>
+> `--validate-mode` is off by default. Existing v1.5 behavior is preserved when not specified.
+>
+> CLI/API 是启用 v1.6 batch validation 的主要入口；Web UI 当前主要展示 batch validation 结果摘要和 source table 状态列。
+>
+> ⚠️ Batch validation recommends `--online`. Without `--online` and without `--include-unknown`, unknown-availability sources may be filtered before batch validation, resulting in 0 batch targets.
+
+### New Content
+
+| Addition | Description |
+|----------|-------------|
+| **Batch validation modes** | fast / standard / deep three levels |
+| **Status classification** | PASS / PARTIAL_PASS / FAIL / BLOCKED / NEEDS_LOGIN / UNSUPPORTED / RISKY / UNKNOWN |
+| **Summary aggregation** | By failure reason, host, group, source type |
+| **HTML report enhancement** | Batch validation summary cards, failure reason distribution |
+| **Web UI enhancement** | Result page batch validation cards, source table validation columns |
+| **CSV enhancement** | New columns: validationMode / finalStatus / firstFailureStage / failureReasons / warnings / durationMs |
+
+### Current Limitations (v1.5 + v1.6 combined)
+
+| Limitation | Description |
+|------------|-------------|
+| Browser Runner | Not supported |
+| Android Runner | Not supported |
+| Rhino compatibility | Not supported; Node vm sandbox only |
+| `java.ajax` | Not executed |
+| Login / Cookie / Session | Not handled |
+| Cloudflare / CAPTCHA bypass | Not attempted |
+| `webView:true` | Not supported |
+
+---
 
 - Maintaining large book source collections (hundreds to thousands)
 - Periodic source cleaning and deduplication
@@ -281,383 +338,4 @@ pnpm dev process samples/sample.json --out ./output --no-online --dedupe conserv
 **`clean-name`** — Name cleaning only:
 
 ```bash
-pnpm dev clean-name samples/sample.json --name-mode zh-only -o ./output/cleaned-names.json
-```
-
-**`split`** — Category split only:
-
-```bash
-pnpm dev split samples/sample.json -o ./output/groups
-```
-
-### Full process Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `<input>` | (required) | Input JSON file path |
-| `-o, --out <dir>` | `./output` | Output directory |
-| `--online` | `false` | Enable online connectivity & search checks |
-| `--no-online` | — | Disable online validation |
-| `--dedupe <level>` | `conservative` | none \| exact \| url \| conservative \| host \| aggressive |
-| `--group-mode <mode>` | `category-first` | overwrite \| append \| preserve \| category-first \| report-only |
-| `--name-mode <mode>` | `loose` | zh-only \| loose |
-| `--concurrency <n>` | `16` | Concurrent HTTP requests |
-| `--timeout <ms>` | `8000` | Request timeout in ms |
-| `--retry <n>` | `1` | Retry count |
-| `--dry-run` | `false` | Run without writing files |
-| `--write-meta` | `false` | Write analysis metadata back to source JSON |
-| `--format <fmt>` | `pretty` | pretty \| minified |
-| `--keep-disabled` | `false` | Keep disabled sources |
-| `--only-enabled` | `false` | Process enabled sources only |
-| `--include-non-http` | `true` | Keep non-HTTP sources |
-| `--keep-latin-when-needed` | `false` | Keep Latin characters in zh-only mode |
-| `--allow-risky-dedupe` | `false` | Allow cross-category/type deletion in host/aggressive dedup |
-| `--include-unknown` | `false` | Include unknown status sources in output |
-| `--include-complex` | `false` | Include complex_unverified status sources in output |
-| `--include-unavailable` | `false` | Include dead/timeout/forbidden sources in output |
-| `--write-normalized-url` | `false` | Write normalized URL back to output |
-| `--strict` | `false` | Non-zero exit on consistency check failure |
-
----
-
-## Input File Requirements
-
-1. **File format**: `.json` only
-2. **Content format**: Legado bookSource JSON array (top-level must be an array)
-3. **File size**: max 50MB
-4. **Required fields**:
-   - `bookSourceName` — source name
-   - `bookSourceUrl` — source URL
-   - `bookSourceType` — type (0=novel, 1=audio, 2=comic, 3=download)
-   - `enabled` — whether enabled
-   - `ruleSearch` — search rules
-   - `ruleBookInfo` — book info rules
-   - `ruleToc` — table of contents rules
-   - `ruleContent` — content rules
-
-See `samples/sample.json` for an example.
-
-### Upload Mechanism
-
-- Uploaded files are stored in an in-memory registry; records expire on server restart
-- Upload preview uses a dedicated `/api/uploads/preview` endpoint (not the download endpoint)
-- Upload and download permissions are separate for security
-
----
-
-## Output Directory
-
-After processing, the following structure is generated in the output directory (default `./output`):
-
-```
-output/
-├── cleaned-sources.json        ← Cleaned, classified, deduplicated sources (importable)
-├── all-sources-reviewed.json   ← Full audit trail for every source
-├── groups/
-│   ├── novel.json              ← Novel category
-│   ├── comic.json              ← Comic category
-│   ├── audio.json              ← Audio category
-│   ├── video.json              ← Video category
-│   ├── download.json           ← Download category
-│   └── other.json              ← Other category
-└── reports/
-    ├── summary.json            ← Processing summary statistics
-    ├── sources.json            ← All source analysis data
-    ├── duplicates.json         ← Dedup group details
-    ├── output-consistency.json ← Output consistency check report
-    ├── dirty-names.json        ← Dirty name report
-    ├── group-mismatches.json   ← Group conflict report
-    ├── cleaned-vs-groups-diff.json ← Cleaned vs groups diff report
-    ├── structural-invalid.json ← Structurally invalid sources list
-    ├── unavailable.json        ← Unavailable sources list
-    ├── risky.json              ← High-risk sources list
-    ├── sources.csv             ← CSV export
-    ├── duplicates.csv          ← Dedup CSV
-    ├── dirty-names.csv         ← Dirty names CSV
-    ├── group-mismatches.csv    ← Group conflicts CSV
-    ├── cleaned-vs-groups-diff.csv ← Diffs CSV
-    ├── duplicate-risk.csv      ← Dedup risk CSV
-    ├── structural-invalid.csv  ← Structural invalid CSV
-    ├── unavailable.csv         ← Unavailable CSV
-    └── report.html             ← Self-contained HTML report
-```
-
-> **Note**: In Web GUI mode, the output directory name must start with `output` (API security restriction).
-
----
-
-## Main Output Files
-
-| File | Purpose | Generated | How to Use |
-|------|---------|-----------|------------|
-| `cleaned-sources.json` | Final cleaned, classified, deduplicated sources | After `process` | ⭐ Import into Legado reader |
-| `all-sources-reviewed.json` | Full audit trail for every source | After `process` | Review processing status, scores, availability |
-| `groups/*.json` | Category-split sources | After `process` | Import specific categories individually |
-| `reports/summary.json` | Processing summary statistics | After `process` | Quick overview of results |
-| `reports/sources.csv` | CSV export of all sources | After `process` | Further analysis in spreadsheet software |
-| `reports/report.html` | Self-contained HTML report | After `process` | Open in browser for a complete report |
-| `reports/dirty-names.json` | Dirty name details | After `process` | Audit: check name cleaning quality |
-| `reports/duplicate-risk.csv` | Dedup risk CSV | After `process` | Audit: review dedup decisions |
-| `reports/output-consistency.json` | Consistency check | After `process` | Verify output correctness |
-
----
-
-## Processing Pipeline
-
-The complete `process` pipeline executes the following steps:
-
-1. **Read input file** — Parse JSON, validate format
-2. **Input filtering** — Apply `--only-enabled` / `--keep-disabled` options
-3. **Name cleaning** (Phase 1/6) — Remove dirty data (loose or zh-only mode)
-4. **URL normalization** (Phase 2/6) — Normalize URLs, extract host keys, mark non-HTTP sources
-5. **Auto classification** (Phase 3/6) — Multi-signal weighted voting
-6. **Structure validation** (Phase 4/6) — Category-aware structural completeness check
-7. **Online validation** (Phase 5/6, optional) — Connectivity check → Search URL verification
-8. **Scoring** (Phase 6/6) — Comprehensive quality scoring
-9. **Deduplication** — Intelligent dedup at the selected level
-10. **Group mode application** — Process the bookSourceGroup field
-11. **Output filtering** — Filter based on availability status
-12. **Write output files** — Generate cleaned-sources.json, groups/*.json, etc.
-13. **Consistency check** — Verify consistency across output files
-14. **Generate reports** — JSON / CSV / HTML format reports
-
-> Online validation can be time-consuming. Results depend on network conditions, target site availability, rate limiting, and regional access restrictions.
-
----
-
-## Progress Display
-
-The Web GUI progress display works as follows:
-
-- A single **overall progress bar** (0-100%) is shown
-- Phase status is visualized through a **phase timeline** (Read → Name Cleaning → URL Normalization → Classification → Structure Validation → Online Validation → Scoring → Dedup → Output → Consistency)
-- **No per-phase progress bar** — only the overall bar
-- During the online validation phase, two additional progress indicators are shown:
-  - 🔗 Connectivity check progress (done / total, percentage)
-  - 🔍 Search check progress (done / total, percentage)
-- A **log panel** displays real-time processing logs (capped at 200 entries)
-- **Summary cards** are displayed upon completion (total input, total output, duplicates removed, unavailable excluded, structural invalids)
-
----
-
-## Default Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| Concurrency | **16** | HTTP request concurrency for online validation |
-| Timeout | **8000ms** | Single HTTP request timeout |
-| Retry | **1** | Number of retries on failure |
-| Dedupe level | **conservative** | Conservative — dedup within same category and type |
-| Group mode | **category-first** | Category first, preserving non-category tags |
-| Name mode | **loose** | Lenient mode, keeps meaningful foreign text |
-| Online | **false** (disabled) | Must be enabled with `--online` |
-| Output format | **pretty** | Pretty-printed JSON |
-| Write meta | **false** | Do not write analysis metadata back to source JSON |
-| Keep disabled | **false** | Exclude disabled sources by default |
-| Only enabled | **false** | Do not filter by default |
-| Include non-HTTP | **true** | Include non-HTTP sources by default |
-
----
-
-## Security Design
-
-The tool implements multi-layered security protections:
-
-1. **Upload restriction**: Only `.json` files, max 50MB
-2. **Dedicated preview API**: Uses `/api/uploads/preview` — not the download endpoint
-3. **Download path whitelist**: `/api/download` only allows `output`, `output-ui`, `output-verify`, `output-fixed` directories
-4. **API path whitelist**: `inputPath` only allows files under `uploads/`, `samples/`, or root `.json` files
-5. **Path traversal protection**: Blocks `../`, null bytes, symlink-based bypasses
-6. **SSRF protection**: Blocks requests to localhost, private IPs (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16), IPv6 loopback (::1), and ULA addresses (fc00::/7)
-7. **Redirect SSRF check**: Re-validates target after each redirect hop
-8. **Header whitelist**: Filters dangerous headers (Host, Cookie, Authorization, X-Forwarded-For, etc.)
-9. **No JS execution**: Does not execute any JavaScript from book sources
-10. **Error message safety**: Error messages never expose absolute paths or stack traces
-11. **CORS restriction**: Only allows `127.0.0.1:5173`, `localhost:5173`, `127.0.0.1:5178`, `localhost:5178`
-12. **Rate limiting**: 100 requests/minute
-13. **Local-only listener**: Defaults to `127.0.0.1`
-14. **Network exposure safety**: If exposing to LAN/public, add authentication, access control, and reverse proxy security
-
----
-
-## Project Structure
-
-```
-legado-source-toolkit/
-├── src/                         Backend, CLI, and core logic
-│   ├── cli.ts                   CLI entry point (commander)
-│   ├── index.ts                 Public API exports
-│   ├── core/                    Core processing modules
-│   │   ├── process.ts           Main processing pipeline
-│   │   ├── parse.ts             File parsing
-│   │   ├── clean-name.ts        Name cleaning
-│   │   ├── normalize-url.ts     URL normalization
-│   │   ├── classify.ts          Auto classification
-│   │   ├── validate-structure.ts Structure validation
-│   │   ├── validate-online.ts   Online connectivity check (SSRF protected)
-│   │   ├── validate-search.ts   Search validation
-│   │   ├── score.ts             Quality scoring
-│   │   ├── dedupe.ts            Deduplication
-│   │   ├── split.ts             Category splitting
-│   │   ├── consistency.ts       Output consistency check
-│   │   └── schema.ts            Zod schema validation
-│   ├── server/                  Backend API server (Fastify)
-│   │   ├── app.ts               Fastify entry point
-│   │   ├── routes/              API route handlers
-│   │   ├── services/            Services (job store, upload store, safe path)
-│   │   └── security/            Security boundary enforcement
-│   ├── constants/               Constants and default configuration
-│   ├── types/                   TypeScript type definitions
-│   └── utils/                   Utility functions (fs, CSV, HTML report, etc.)
-├── web/                         React Web UI
-│   ├── App.tsx                  App entry + page routing
-│   ├── pages/                   11 page components
-│   ├── components/              Reusable UI components
-│   ├── store/                   Global state management
-│   └── lib/                     API client and types
-├── samples/                     Sample input files
-├── tests/                       Test files
-├── docs/                        Supplementary documentation
-├── .github/workflows/           CI configuration
-├── start-ui.bat                 Windows one-click launcher
-├── package.json                 Project configuration
-├── tsconfig.json                Backend TypeScript config
-├── tsconfig.web.json            Frontend TypeScript config
-├── vite.config.ts               Vite configuration
-├── vitest.config.ts             Test configuration
-├── eslint.config.js             ESLint configuration
-├── .gitignore                   Git ignore rules
-├── .env.example                 Environment variable example
-└── LICENSE                      MIT License
-```
-
----
-
-## Common Commands
-
-```bash
-pnpm install          # Install dependencies
-pnpm dev              # Run CLI in dev mode
-pnpm gui              # Start Web GUI backend API
-pnpm web:dev          # Start frontend dev server
-pnpm typecheck        # TypeScript type check (backend)
-pnpm web:typecheck    # TypeScript type check (frontend)
-pnpm lint             # ESLint code style check
-pnpm build            # Build backend CLI (tsc)
-pnpm web:build        # Build frontend (vite build)
-pnpm test             # Run tests (vitest run)
-pnpm verify           # Full verification (typecheck + web:typecheck + lint + build + web:build + test)
-pnpm clean            # Clean build artifacts (dist, dist-web, coverage, uploads, output-*)
-```
-
----
-
-## Build
-
-```bash
-# Build backend CLI
-pnpm build
-
-# Build frontend Web UI
-pnpm web:build
-```
-
-After building:
-- Backend CLI output: `dist/`
-- Frontend Web UI output: `dist-web/`
-
-Use `pnpm start` or `pnpm cli` to run the compiled CLI.
-
----
-
-## Testing and Verification
-
-```bash
-# Full verification (recommended before pushing)
-pnpm verify
-```
-
-`pnpm verify` executes these 6 checks sequentially:
-
-1. `pnpm typecheck` — TypeScript type checking (`tsc --noEmit`)
-2. `pnpm web:typecheck` — Frontend type checking (`tsc -p tsconfig.web.json --noEmit`)
-3. `pnpm lint` — ESLint code style check (checks `src/`, `tests/`, `web/`)
-4. `pnpm build` — TypeScript compilation (`tsc`)
-5. `pnpm web:build` — Vite frontend production build (`vite build`)
-6. `pnpm test` — Run all tests (`vitest run`)
-
-GitHub Actions CI automatically runs: typecheck → lint → build → web:build → test.
-
----
-
-## FAQ
-
-**Q: Why do I see "Web UI has not been built" when I open port 5178?**
-A: You're opening the backend API address (port 5178). The frontend hasn't been built or started. Use development mode: run `pnpm gui` for the backend, then `pnpm web:dev` for the frontend, and visit `http://127.0.0.1:5173`.
-
-**Q: Should I open 5173 or 5178?**
-A: The main Web UI address is `http://127.0.0.1:5173` (frontend dev server). Port 5178 is the backend API.
-
-**Q: Why is online validation slow?**
-A: Online validation sends HTTP requests to every source URL. Hundreds of sources can take minutes. Reduce concurrency, decrease timeout, or skip online validation (`--no-online`).
-
-**Q: Why are some sources marked as unavailable?**
-A: Possible reasons: site is down, blocks non-browser UA, rate-limited, requires login, regional restrictions, DNS failure. This does not mean the source is invalid — it simply couldn't be verified from your current environment.
-
-**Q: Why can't I download uploaded files via the download API?**
-A: This is a security design choice. Uploaded files are previewed via `/api/uploads/preview`. The download endpoint only allows output directories. This prevents unauthorized access to uploaded data.
-
-**Q: Why is the results page empty?**
-A: You need to run a processing job first. After processing completes, results appear on the Results page. Make sure the output directory starts with `output`.
-
-**Q: Does this tool execute JavaScript from book sources?**
-A: **No.** This tool does not execute any JavaScript from book sources (including `ruleContent.webJs`, `loginCheckJs`, `jsLib` fields).
-
-**Q: Can I deploy this to a public server?**
-A: Technically yes, but **not recommended**. The tool has no authentication or access control by default and listens only on `127.0.0.1`. For public access, configure a reverse proxy, HTTPS, and authentication.
-
-**Q: Which output file can I import into Legado?**
-A: `cleaned-sources.json` is the final cleaned, classified, deduplicated source list suitable for importing into Legado. Category-split `groups/*.json` files can also be imported individually.
-
-**Q: What is the default concurrency?**
-A: The default concurrency is **16**. Adjust with the `--concurrency` option.
-
----
-
-## Roadmap
-
-- [x] Name cleaning + URL normalization
-- [x] Auto classification + structure validation
-- [x] Online connectivity & search verification (SSRF protected)
-- [x] Quality scoring + multi-level dedup
-- [x] Web GUI + CLI
-- [x] Path security & SSRF protection
-- [x] Output consistency check
-- [x] Real-time processing progress & logs
-- [x] Unified global state management
-- [x] File upload preview (uploadId approach)
-- [ ] Batch import/export
-- [ ] Custom classification rules
-- [ ] Rule comparison tool
-- [ ] English UI support
-
----
-
-## Disclaimer
-
-1. **This tool is for processing user-owned or authorized Legado book source JSON files only.** Users should only process sources they have the right to use, store, and verify.
-2. **This tool does not provide, host, or distribute any novel content.** All operations target book source metadata (URLs, rules, etc.), not actual content.
-3. **This tool does not guarantee third-party site availability.** Online validation results depend on network conditions, rate limiting, and regional access restrictions.
-4. **Users must comply with applicable laws and the target sites' terms of service.** Online validation sends HTTP requests to the URLs configured in book sources.
-5. **Do not use for infringement, bypassing access controls, or abusing third-party services.** This tool is intended for legitimate book source management and maintenance only.
-6. **This software is provided "as is" without warranty of any kind.** See [LICENSE](./LICENSE) for details.
-
----
-
-## License
-
-MIT License — see [LICENSE](./LICENSE) file.
-
----
-
-*Legado Source Toolkit v1.2.0 — Built with TypeScript, Fastify, React, and Vite*
+pnpm dev clean-name samples/sample.json --name-mode zh

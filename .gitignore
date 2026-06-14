@@ -12,6 +12,9 @@ output-*
 uploads/
 reports/
 
+# ── Archives ──
+*.zip
+
 # ── Environment files ──
 .env
 .env.*
