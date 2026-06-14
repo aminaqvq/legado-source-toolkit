@@ -23,11 +23,12 @@ export {
 export type { RuleResult, RuleVerifyDetail, VerifyAllResult, ResolvedUrl } from './core/rule-engine/types.js';
 
 // ── Types ──
-export type { BookSource, RuleSearch, RuleBookInfo, RuleToc, RuleContent } from './types/book-source.js';
+export type { BookSource, RuleSearch, RuleBookInfo, RuleToc, RuleContent, BatchValidationMode } from './types/book-source.js';
 export type {
   SourceAnalysis,
   DuplicateGroup,
   ProcessSummary,
   ProcessReport,
   ProcessOptions,
+  BatchValidationSummary,
 } from './types/analysis.js';

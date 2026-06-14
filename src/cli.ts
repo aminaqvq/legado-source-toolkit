@@ -9,6 +9,7 @@ import { validateStructure } from './core/validate-structure.js';
 import { splitByCategory } from './core/split.js';
 import { writeJsonFile, ensureOutputDir } from './utils/fs.js';
 import { keyValue, heading } from './utils/logger.js';
+import { normalizeValidateMode } from './core/batch-validate.js';
 import path from 'node:path';
 
 const program = new Command();
@@ -45,6 +46,8 @@ program
   .option('--include-unavailable', '在 cleaned-sources 中包含 dead/timeout/forbidden 源', false)
   .option('--write-normalized-url', '将规范化后的 URL 写回输出', false)
   .option('--strict', '输出一致性检查失败时以非零退出码退出', false)
+  .option('--validate-mode <mode>', '批量深度校验模式: fast | standard | deep (默认不启用)', '')
+  .option('--batch-concurrency <n>', '批量校验并发数', '8')
   .action(async (input: string, options: Record<string, string | boolean>) => {
     const dedupe = String(options.dedupe);
     const groupMode = String(options.groupMode);
@@ -80,6 +83,25 @@ program
       includeUnavailable: Boolean(options.includeUnavailable),
       writeNormalizedUrl: Boolean(options.writeNormalizedUrl),
       strict: Boolean(options.strict),
+      validateMode: (() => {
+        const raw = String(options.validateMode ?? '');
+        if (raw === '') return undefined;
+        const mode = normalizeValidateMode(raw);
+        if (!mode) {
+          console.error(`Error: Invalid --validate-mode "${raw}". Expected one of: fast, standard, deep.`);
+          process.exit(1);
+        }
+        return mode;
+      })(),
+      batchConcurrency: (() => {
+        const raw = options.batchConcurrency;
+        const n = parseInt(String(raw), 10);
+        if (!Number.isInteger(n) || n < 1 || n > 100) {
+          console.error(`Error: --batch-concurrency must be an integer between 1 and 100, got: ${raw}`);
+          process.exit(1);
+        }
+        return n;
+      })(),
     });
   });
 

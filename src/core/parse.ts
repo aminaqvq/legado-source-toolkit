@@ -100,6 +100,9 @@ function createInitialAnalysis(source: BookSource, index: number): SourceAnalysi
     },
     warnings: [],
     risks: [],
+    batchFailureReasons: [],
+    batchWarnings: [],
+    batchSuggestions: [],
     processedAt: new Date().toISOString(),
   };
 }

@@ -27,7 +27,8 @@ export function dedupeSources(
   let groupIdCounter = 0;
 
   if (options.level === 'none') {
-    return { kept, groups };
+    // Preserve existing kept states set by earlier pipeline steps
+    return { kept: analyses.map((a) => a.kept), groups: [] };
   }
 
   // ── Group sources by dedupe key ──

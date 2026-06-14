@@ -19,6 +19,7 @@ import {
   generateDuplicateRiskCsv, generateStructuralInvalidCsv, generateUnavailableCsv,
 } from './consistency.js';
 import { heading, info, success, warn, progress, keyValue } from '../utils/logger.js';
+import { runBatchValidation, mapStagesToBatchResult, summarizeBatchValidation } from './batch-validate.js';
 import pLimit from 'p-limit';
 import path from 'node:path';
 
@@ -28,6 +29,9 @@ import path from 'node:path';
 export async function processSources(options: ProcessOptions): Promise<ProcessReport> {
   const log = (msg: string) => { options.onLog?.(msg); };
   const setPhase = (phase: string) => { options.onPhaseChange?.(phase); };
+
+  // v1.6 batch validation summary accumulator
+  let batchValidationSummary: import('../types/analysis.js').BatchValidationSummary | undefined;
 
   heading('Legado Source Toolkit — Processing');
   log('▶ 开始处理');
@@ -301,6 +305,70 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
     }
   }
 
+  // ═══ Step 7b (moved): Batch deep validation (v1.6) — only for target sources ═══
+  if (options.validateMode) {
+    // Target: kept + valid HTTP + structurally sound
+    const batchTargets = analyses.filter((a) =>
+      a.kept &&
+      a.urlStatus === 'VALID_HTTP' &&
+      a.validationStatus !== 'STRUCTURE_INVALID',
+    );
+
+    if (batchTargets.length > 0) {
+      setPhase('批量深度校验');
+      heading('Phase 6b/6: Batch deep validation');
+      const batchLimit = pLimit(options.batchConcurrency ?? 8);
+      const batchMode = options.validateMode;
+      info(`Starting batch validation on ${batchTargets.length} target source(s) (mode: ${batchMode}, concurrency: ${options.batchConcurrency ?? 8})...`);
+      log(`▶ 开始批量深度校验: ${batchTargets.length} 个目标源 (模式: ${batchMode})`);
+
+      let batchDone = 0;
+      const totalTargets = batchTargets.length;
+      const batchResults: import('./batch-validate.js').BatchSourceValidationResult[] = [];
+
+      const batchTasks = batchTargets.map((analysis) =>
+        batchLimit(async () => {
+          const src = sources[analysis.index];
+          const startTime = Date.now();
+
+          // Run the appropriate validation
+          const { stageResults } = await runBatchValidation(src, batchMode, {
+            timeout: options.timeout,
+          });
+
+          const durationMs = Date.now() - startTime;
+
+          // Populate analysis fields
+          analysis.batchValidationMode = batchMode;
+          analysis.batchDurationMs = durationMs;
+
+          const result = mapStagesToBatchResult(
+            src, batchMode, analysis, stageResults, durationMs,
+          );
+          analysis.batchValidationStatus = result.status;
+          analysis.batchFailureReasons = result.failureReasons;
+          analysis.batchWarnings = result.warnings;
+          analysis.batchSuggestions = result.suggestions;
+          analysis.firstFailureStage = result.firstFailureStage;
+
+          batchResults.push(result);
+          batchDone++;
+          options.onProgress?.('batch', batchDone, totalTargets);
+          progress(batchDone, totalTargets, 'Batch validate');
+        }),
+      );
+      await Promise.all(batchTasks);
+      success(`Batch deep validation complete: ${batchDone} target source(s)`);
+      log(`✓ 批量深度校验完成: ${batchDone}/${totalTargets} 个目标源`);
+
+      // Compute summary
+      batchValidationSummary = summarizeBatchValidation(batchResults);
+    } else {
+      info('Batch validation skipped: no target sources (all filtered/invalid/non-HTTP)');
+      log('⊘ 批量深度校验跳过: 无有效的目标源');
+    }
+  }
+
   const keptAnalyses = analyses.filter((a) => a.kept);
   const finalSources: BookSource[] = keptAnalyses.map((a) => {
     const src = { ...sources[a.index] }; // shallow clone so we can mutate
@@ -322,7 +390,7 @@ export async function processSources(options: ProcessOptions): Promise<ProcessRe
   });
 
   // ═══ Step 11: Build summary ═══
-  const summary = buildSummary(analyses, sources, dedupeResult.groups.length, removedCount, excludedAvail.size > 0);
+  const summary = buildSummary(analyses, sources, dedupeResult.groups.length, removedCount, excludedAvail.size > 0, batchValidationSummary);
 
   const report: ProcessReport = {
     summary,
@@ -541,6 +609,7 @@ function buildSummary(
   duplicateGroupCount: number,
   removedCount: number,
   _filterUnavailable: boolean,
+  batchValidation?: import('../types/analysis.js').BatchValidationSummary,
 ): ProcessSummary {
   const input = buildZoneStats(analyses, sources, 'all');
   const output = buildZoneStats(analyses, sources, 'kept');
@@ -564,6 +633,7 @@ function buildSummary(
       warnCount: analyses.filter((a) => a.validationStatus === 'STRUCTURE_WARN').length,
       invalidCount: analyses.filter((a) => a.validationStatus === 'STRUCTURE_INVALID').length,
     },
+    batchValidation,
   };
 }
 
@@ -575,6 +645,7 @@ function createEmptyReport(): ProcessReport {
       output: { total: 0, categoryCounts: {}, availabilityCounts: {}, typeCounts: {}, averageRespondTime: 0, measuredAverageRespondTime: null },
       removed: { duplicateCount: 0, unavailableCount: 0, riskyCount: 0 },
       validation: { okCount: 0, warnCount: 0, invalidCount: 0 },
+      batchValidation: undefined,
     },
     sources: [],
     duplicates: [],
