@@ -34,20 +34,15 @@ interface SafeFetchResult {
   finalUrl: string;
   contentType?: string;
   duration: number;
-  /** Machine-readable failure reason (for error classification) */
   failureReason?: 'ssrf_blocked' | 'timeout' | 'dns_failed' | 'connection_error' | 'network_error';
-  /** Human-readable error message */
   error?: string;
 }
 
 interface SafeFetchOptions {
   timeout?: number;
   allowPrivateNetwork?: boolean;
-  /** HTTP method (default GET) */
   method?: string;
-  /** Request body (for POST) */
   body?: string;
-  /** Additional headers to merge after source headers are filtered */
   extraHeaders?: Record<string, string>;
 }
 
@@ -60,7 +55,6 @@ async function safeFetch(
   const method = (options.method ?? 'GET').toUpperCase();
   const MAX_REDIRECTS = 5;
 
-  // SSRF check on initial URL
   if (!options.allowPrivateNetwork) {
     const safety = await isSafeURL(url, false);
     if (!safety.safe) {
@@ -68,7 +62,6 @@ async function safeFetch(
     }
   }
 
-  // Build headers — filter dangerous ones from source, then merge extras
   const headers: Record<string, string> = {
     'User-Agent': DEFAULT_USER_AGENT,
     'Accept': 'text/html,application/json,*/*',
@@ -81,7 +74,6 @@ async function safeFetch(
     } catch { /* ignore */ }
   }
   if (options.extraHeaders) {
-    // Extra headers are already filtered by the caller (or are safe defaults)
     Object.assign(headers, filterCustomHeaders(options.extraHeaders));
   }
 
@@ -100,13 +92,12 @@ async function safeFetch(
         headers,
         body: method === 'POST' ? (options.body || undefined) : undefined,
         signal: controller.signal,
-        redirect: 'manual', // handle redirects ourselves for SSRF re-check
+        redirect: 'manual',
       });
     } finally {
       clearTimeout(tid);
     }
 
-    // ── Manual redirect loop with per-hop SSRF re-check ──
     while (
       (response.status === 301 || response.status === 302 ||
        response.status === 307 || response.status === 308) &&
@@ -115,10 +106,8 @@ async function safeFetch(
       const location = response.headers.get('location');
       if (!location) break;
 
-      // Resolve relative redirect URL
       const redirectUrl = new URL(location, currentUrl).toString();
 
-      // SSRF re-check on redirect target
       if (!options.allowPrivateNetwork) {
         const redirectSafety = await isSafeURL(redirectUrl, false);
         if (!redirectSafety.safe) {
@@ -135,7 +124,6 @@ async function safeFetch(
       currentUrl = redirectUrl;
       redirectCount++;
 
-      // For 307/308, preserve original method and body; for 301/302, switch to GET
       const redirectMethod =
         (response.status === 307 || response.status === 308) ? method : 'GET';
       const redirectBody =
@@ -155,7 +143,6 @@ async function safeFetch(
       }
     }
 
-    // ── Read body (max 256KB) ──
     const reader = response.body?.getReader();
     const chunks: Uint8Array[] = [];
     if (reader) {
@@ -253,19 +240,16 @@ export async function verifyRuleSearch(
 
   logs.push(`keyword="${keyword}"`);
 
-  // No search URL → skip
   if (!source.searchUrl?.trim()) {
     return makeResult('search', 'RULE_NOT_CHECKED', startTime, logs, undefined, undefined, undefined, undefined, undefined, rules, errors, suggestions);
   }
 
-  // Complex JS → skip
   if (/\beval\b/i.test(source.searchUrl) || /java\.ajax/i.test(source.searchUrl)) {
     errors.push('unsupported_java_ajax');
     suggestions.push('当前安全模式不执行 java.ajax，请改用兼容模式或人工复核');
     return makeResult('search', 'RULE_SKIPPED', startTime, logs, undefined, undefined, undefined, undefined, undefined, rules, errors, suggestions);
   }
 
-  // Check for webView
   if (/webView/i.test(source.searchUrl)) {
     errors.push('unsupported_webview');
     suggestions.push('当前 Node Safe Runner 不支持 webView:true，后续应使用 Browser Runner');
@@ -277,7 +261,6 @@ export async function verifyRuleSearch(
   }
 
   try {
-    // Resolve URL
     const resolved = resolveSearchUrl({
       searchUrl: source.searchUrl,
       baseUrl: source.bookSourceUrl ?? '',
@@ -287,7 +270,6 @@ export async function verifyRuleSearch(
 
     logs.push(`resolved URL: ${resolved.url}`);
 
-    // SSRF-safe fetch with POST support
     const fetchResult = await safeFetch(resolved.url, source, {
       timeout: options.timeout,
       allowPrivateNetwork: options.allowPrivateNetwork,
@@ -297,8 +279,6 @@ export async function verifyRuleSearch(
     });
 
     logs.push(`HTTP ${fetchResult.status}, ${fetchResult.body.length} bytes`);
-
-    // Build network trace
     const netTrace = buildNetworkTrace(resolved.url, resolved.method, fetchResult);
 
     if (!fetchResult.ok || isErrorBody(fetchResult.body)) {
@@ -310,7 +290,6 @@ export async function verifyRuleSearch(
       );
     }
 
-    // Execute bookList rule
     const listResult = executeRule(bookListRule, { content: fetchResult.body, debug: true });
     rules.push({
       ruleName: 'bookList', rule: bookListRule,
@@ -330,10 +309,8 @@ export async function verifyRuleSearch(
       );
     }
 
-    // ── Extract search items with item-scope rules ──
     const pageUrl = fetchResult.finalUrl || resolved.url;
     const searchItems = extractSearchItems(source, fetchResult.body, listResult, pageUrl, logs, rules, errors, suggestions);
-
     const hasBookUrl = searchItems.some(i => i.bookUrl);
 
     const sample = searchItems.length > 0
@@ -416,7 +393,6 @@ export async function verifyRuleBookInfo(
     });
 
     const bookInfo = extractBookInfo(source, fetchResult.body, bookUrl, logs, rules, errors, suggestions);
-
     const sample = bookInfo.name ?? '';
 
     if (!bookInfo.name) {
@@ -511,7 +487,6 @@ export async function verifyRuleToc(
       );
     }
 
-    // ── Extract chapters with item-scope sub-rules ──
     const chapters = extractChapterItems(source, fetchResult.body, listResult, tocUrl, logs, rules, errors, suggestions);
     const hasChapterUrl = chapters.some(c => c.chapterUrl);
 
@@ -544,12 +519,12 @@ export async function verifyRuleToc(
 }
 
 // ══════════════════════════════════════════════════════
-//  4. verifyRuleContent
+//  4. verifyRuleContent — STRICT contract: extracted ALWAYS returned
 // ══════════════════════════════════════════════════════
 
 export async function verifyRuleContent(
   source: BookSource,
-  chapterUrl: string,
+  contentUrl: string,
   options: { timeout?: number; allowPrivateNetwork?: boolean } = {},
 ): Promise<RuleVerifyDetail> {
   const logs: string[] = [];
@@ -558,57 +533,91 @@ export async function verifyRuleContent(
   const errors: FailureReason[] = [];
   const suggestions: string[] = [];
 
-  if (!chapterUrl) {
-    return makeResult('content', 'RULE_NOT_CHECKED', startTime, logs, 'No chapterUrl provided', undefined, undefined, undefined, undefined, rules, errors, suggestions);
+  if (!contentUrl) {
+    return makeResult('content', 'RULE_NOT_CHECKED', startTime, logs, 'No contentUrl provided', undefined, undefined, undefined, undefined, rules, errors, suggestions, undefined, { content: '', contentLength: 0, isTooShort: true });
   }
 
-  const contentRule = source.ruleContent?.content;
-  if (!contentRule) {
-    return makeResult('content', 'RULE_NOT_CHECKED', startTime, logs, 'No ruleContent.content', undefined, undefined, undefined, undefined, rules, errors, suggestions);
+  const contentRuleStr = source.ruleContent?.content;
+  if (!contentRuleStr) {
+    return makeResult('content', 'RULE_NOT_CHECKED', startTime, logs, 'No ruleContent.content defined', undefined, undefined, undefined, undefined, rules, errors, suggestions, undefined, { content: '', contentLength: 0, isTooShort: true });
   }
 
   try {
-    const fetchResult = await safeFetch(chapterUrl, source, {
-      timeout: options.timeout,
-      allowPrivateNetwork: options.allowPrivateNetwork,
+    const resolvedUrl = resolveCandidateUrl(contentUrl, {
+      baseUrl: source.bookSourceUrl ?? '',
+      sourceBaseUrl: source.bookSourceUrl ?? '',
     });
+    if (!resolvedUrl) {
+      errors.push('invalid_url');
+      return makeResult('content', 'RULE_PARSE_ERROR', startTime, logs, `Cannot resolve content URL: ${contentUrl}`, undefined, undefined, undefined, undefined, rules, errors, suggestions, undefined, { content: '', contentLength: 0, isTooShort: true });
+    }
 
+    logs.push(`resolved URL: ${resolvedUrl}`);
+
+    const fetchResult = await safeFetch(resolvedUrl, source, options);
     logs.push(`HTTP ${fetchResult.status}, ${fetchResult.body.length} bytes`);
-    const netTrace = buildNetworkTrace(chapterUrl, 'GET', fetchResult);
+    const netTrace = buildNetworkTrace(resolvedUrl, 'GET', fetchResult);
 
     if (!fetchResult.ok || isErrorBody(fetchResult.body)) {
       mapFetchFailure(fetchResult, errors);
-      return makeResult(
-        'content', 'RULE_EMPTY_RESULT', startTime, logs,
-        `HTTP ${fetchResult.status} — response appears invalid`,
-        chapterUrl, fetchResult.body.length, 0, undefined, rules, errors, suggestions, netTrace,
-      );
+      return makeResult('content', 'RULE_EMPTY_RESULT', startTime, logs, 'Invalid response', resolvedUrl, fetchResult.body.length, undefined, undefined, rules, errors, suggestions, netTrace, { content: '', contentLength: 0, isTooShort: true });
     }
 
-    const contentResult = executeRule(contentRule, { content: fetchResult.body });
+    // Execute content rule
+    const contentResult = executeRule(contentRuleStr, { content: fetchResult.body });
+    const resultText = contentResult.text ?? '';
+
     rules.push({
-      ruleName: 'content', rule: contentRule,
-      inputKind: 'document', outputPreview: (contentResult.text ?? '').slice(0, 80),
-      outputCount: 1,
-      status: contentResult.text && contentResult.text.length >= 20 ? 'PASS' : 'FAIL',
+      ruleName: 'content', rule: contentRuleStr,
+      inputKind: 'document', outputPreview: resultText.slice(0, 80),
+      outputCount: resultText.length,
+      status: resultText.length >= 20 ? 'PASS' : 'FAIL',
       durationMs: contentResult.duration,
     });
 
-    const resultText = contentResult.text ?? '';
+    logs.push(`content rule: ${resultText.length} chars`);
+
+    // ALWAYS return extracted with contentLength + isTooShort
+    const contentData: ContentResult = {
+      contentLength: resultText.length,
+      contentPreview: resultText.slice(0, 200),
+      isTooShort: resultText.length < 20,
+    };
 
     if (resultText.length < 20) {
-      errors.push('empty_response');
-      suggestions.push('检查 ruleContent.content 规则是否正确匹配正文');
+      errors.push('content_too_short');
+      suggestions.push('检查 ruleContent.content；也可能是登录页、验证码页或付费章节');
+      return {
+        status: 'RULE_EMPTY_RESULT',
+        stage: 'content',
+        url: resolvedUrl,
+        responseSize: fetchResult.body.length,
+        resultCount: 0,
+        resultSample: resultText.slice(0, 200),
+        duration: Date.now() - startTime,
+        logs,
+        extracted: contentData,
+        request: netTrace,
+        rules,
+        errors,
+        suggestions,
+      };
+    }
+
+    if (resultText.length < 100) {
+      suggestions.push('正文较短（20-100 字符），可能是轻小说或页面截断，建议人工复核');
     }
 
     return {
-      status: resultText.length >= 20 ? 'RULE_VERIFIED' : 'RULE_EMPTY_RESULT',
+      status: 'RULE_VERIFIED',
       stage: 'content',
-      url: chapterUrl,
+      url: resolvedUrl,
       responseSize: fetchResult.body.length,
-      resultSample: resultText.slice(0, 80),
+      resultCount: 1,
+      resultSample: resultText.slice(0, 200),
       duration: Date.now() - startTime,
       logs,
+      extracted: contentData,
       request: netTrace,
       rules,
       errors: errors.length > 0 ? errors : undefined,
@@ -616,10 +625,7 @@ export async function verifyRuleContent(
     };
   } catch (err) {
     errors.push('network_error');
-    return makeResult(
-      'content', 'RULE_PARSE_ERROR', startTime, logs,
-      `Error: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    return makeResult('content', 'RULE_PARSE_ERROR', startTime, logs, `Error: ${err instanceof Error ? err.message : String(err)}`, undefined, undefined, undefined, undefined, rules, errors, suggestions, undefined, { content: '', contentLength: 0, isTooShort: true });
   }
 }
 
@@ -657,7 +663,7 @@ export async function verifyAllRules(
     return buildFinalResult(source, steps, startTime);
   }
 
-  // ── Step 2: Book Info (REAL: use search.items[0].bookUrl) ──
+  // ── Step 2: Book Info ──
   const searchItems = getSearchItems(searchStep);
   const firstBookUrl = pickFirstValidBookUrl(searchItems);
   if (!firstBookUrl) {
@@ -679,7 +685,7 @@ export async function verifyAllRules(
     return buildFinalResult(source, steps, startTime);
   }
 
-  // ── Step 3: TOC (REAL: use bookInfo.tocUrl, fallback to bookUrl) ──
+  // ── Step 3: TOC ──
   const tocUrl = getBookInfoTocUrl(infoStep) || infoStep.url || '';
   const tocWarnings: string[] = [];
   if (!getBookInfoTocUrl(infoStep) && infoStep.url) {
@@ -700,7 +706,7 @@ export async function verifyAllRules(
     return buildFinalResult(source, steps, startTime);
   }
 
-  // ── Step 4: Content (REAL: use toc.chapters[0].chapterUrl) ──
+  // ── Step 4: Content ──
   const chapters = getTocChapters(tocStep);
   const firstChapterUrl = pickFirstValidChapterUrl(chapters);
   if (!firstChapterUrl) {
@@ -735,6 +741,7 @@ function makeResult(
   errors?: FailureReason[],
   suggestions?: string[],
   request?: NetworkTrace,
+  extracted?: Record<string, unknown>,
 ): RuleVerifyDetail {
   return {
     status,
@@ -750,6 +757,7 @@ function makeResult(
     errors,
     suggestions,
     request,
+    extracted,
   };
 }
 
@@ -836,10 +844,6 @@ function isCloudflareOrCaptcha(body: string): boolean {
     lower.includes('access denied');
 }
 
-/**
- * Map safeFetch result to FailureReason entries.
- * Used by all four verify stages to report accurate errors.
- */
 function mapFetchFailure(fetchResult: SafeFetchResult, errors: FailureReason[]): void {
   if (fetchResult.ok && !isErrorBody(fetchResult.body)) return;
 
@@ -862,9 +866,6 @@ function mapFetchFailure(fetchResult: SafeFetchResult, errors: FailureReason[]):
 
 // ── Extraction Helpers ──
 
-/**
- * Extract SearchItem[] from search page response using item-scope sub-rules.
- */
 function extractSearchItems(
   source: BookSource,
   searchBody: string,
@@ -889,7 +890,6 @@ function extractSearchItems(
     let okCount = 0;
     let totalCount = 0;
 
-    // Extract name
     if (nameRule) {
       totalCount++;
       const nameResult = executeRuleOnScope(nameRule, { raw: el, kind }, { content: searchBody });
@@ -897,14 +897,12 @@ function extractSearchItems(
       if (nameResult.error) item.error = nameResult.error;
     }
 
-    // Extract author
     if (authorRule) {
       totalCount++;
       const authorResult = executeRuleOnScope(authorRule, { raw: el, kind }, { content: searchBody });
       if (authorResult.text) { item.author = authorResult.text; okCount++; }
     }
 
-    // Extract bookUrl
     if (bookUrlRule) {
       totalCount++;
       const urlResult = executeRuleOnScope(bookUrlRule, { raw: el, kind }, { content: searchBody, baseUrl: pageUrl });
@@ -925,8 +923,6 @@ function extractSearchItems(
     items.push(item);
   }
 
-
-  // Track rule traces for item-scope rules
   if (nameRule && items.length > 0) {
     rules.push({
       ruleName: 'name (scope)', rule: nameRule,
@@ -946,7 +942,6 @@ function extractSearchItems(
     });
   }
 
-  // If no bookUrls extracted
   if (items.length > 0 && !items.some(i => i.bookUrl)) {
     errors.push('book_url_missing');
     suggestions.push('检查 ruleSearch.bookUrl 是否需要在 bookList item 内执行；检查是否需要 @href');
@@ -955,9 +950,6 @@ function extractSearchItems(
   return items;
 }
 
-/**
- * Extract BookInfoResult from book info page response.
- */
 function extractBookInfo(
   source: BookSource,
   body: string,
@@ -1011,13 +1003,11 @@ function extractBookInfo(
 
   const tocUrlRule = source.ruleBookInfo?.tocUrl;
   if (tocUrlRule) {
-    // Use scoped pipeline to handle .read-btn@href style rules
     const pipeline = resolveScopedPipelineForExtract(tocUrlRule);
     let tocText: string | null = null;
     if (pipeline.selectorRule) {
       const tocRes = executeRule(pipeline.selectorRule, { content: body });
       if (tocRes.text && pipeline.getter) {
-        // getter on element: re-execute to get attribute
         if (tocRes.elements.length > 0) {
           tocText = getElementAttributeForExtract(tocRes.elements[0], pipeline.getter);
         }
@@ -1025,7 +1015,7 @@ function extractBookInfo(
         tocText = tocRes.text;
       }
     } else if (pipeline.getter) {
-      tocText = null; // getter-only on full doc makes no sense for tocUrl
+      tocText = null;
     }
     if (tocText) {
       const resolved = resolveCandidateUrl(tocText, {
@@ -1039,10 +1029,6 @@ function extractBookInfo(
   return result;
 }
 
-/**
- * Quick resolveScopedPipeline + getElementAttribute helpers for extraction functions.
- * (Minimal standalone copies to avoid circular or complex imports from executor.)
- */
 function resolveScopedPipelineForExtract(ruleStr: string): { selectorRule: string | null; getter: string | null } {
   const trimmed = ruleStr.trim();
   if (/^@(text|html|outerhtml|href|src|val)$/i.test(trimmed)) {
@@ -1106,9 +1092,6 @@ function serializeElementForExtract(el: any): string {
   return String(el);
 }
 
-/**
- * Extract ChapterItem[] from TOC page response using item-scope sub-rules.
- */
 function extractChapterItems(
   source: BookSource,
   tocBody: string,
@@ -1130,13 +1113,11 @@ function extractChapterItems(
     const kind = detectItemKind(el);
     const ch: ChapterItem = {};
 
-    // Extract chapter name
     if (chapterNameRule) {
       const nameResult = executeRuleOnScope(chapterNameRule, { raw: el, kind }, { content: tocBody });
       if (nameResult.text) ch.chapterName = nameResult.text;
     }
 
-    // Extract chapter URL
     if (chapterUrlRule) {
       const urlResult = executeRuleOnScope(chapterUrlRule, { raw: el, kind }, { content: tocBody, baseUrl: resolvedTocUrl });
       if (urlResult.text) {
@@ -1145,7 +1126,7 @@ function extractChapterItems(
           sourceBaseUrl: source.bookSourceUrl ?? '',
         });
         if (resolved) ch.chapterUrl = resolved;
-        else ch.chapterUrl = urlResult.text; // keep raw
+        else ch.chapterUrl = urlResult.text;
       } else if (urlResult.error === 'unsupported_rule_syntax') {
         errors.push('unsupported_rule_syntax');
         suggestions.push(`chapterUrl rule "${chapterUrlRule}" 语法暂不支持`);
@@ -1156,7 +1137,6 @@ function extractChapterItems(
     chapters.push(ch);
   }
 
-  // Track scope rules
   if (chapterNameRule && chapters.length > 0) {
     rules.push({
       ruleName: 'chapterName (scope)', rule: chapterNameRule,
@@ -1176,7 +1156,6 @@ function extractChapterItems(
     });
   }
 
-  // If no chapterUrls
   if (chapters.length > 0 && !chapters.some(c => c.chapterUrl)) {
     errors.push('chapter_url_missing');
     suggestions.push('检查 ruleToc.chapterUrl；如果章节链接由 JS 生成，可能需要 Browser Runner');
