@@ -1,6 +1,6 @@
 {
   "name": "legado-source-toolkit",
-  "version": "1.2.0",
+  "version": "1.5.0-rc.1",
   "description": "A local toolkit for cleaning, validating, classifying, and deduplicating Legado (开源阅读) book source JSON exports",
   "type": "module",
   "bin": {
@@ -36,11 +36,15 @@
     "@fastify/multipart": "^9.0.1",
     "@fastify/rate-limit": "^11.0.0",
     "@fastify/static": "^8.0.2",
+    "cheerio": "^1.2.0",
     "commander": "^12.1.0",
     "fastify": "^5.1.0",
     "fs-extra": "^11.2.0",
+    "jsonpath-plus": "^10.4.0",
     "p-limit": "^5.0.0",
     "picocolors": "^1.1.1",
+    "xmldom": "^0.6.0",
+    "xpath": "^0.0.34",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -48,6 +52,7 @@
     "@types/node": "^20.17.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/xmldom": "^0.1.34",
     "@typescript-eslint/eslint-plugin": "^8.60.1",
     "@typescript-eslint/parser": "^8.60.1",
     "@vitejs/plugin-react": "^4.3.4",

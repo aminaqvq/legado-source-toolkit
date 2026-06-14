@@ -48,7 +48,54 @@ All operations run locally — no data is uploaded to third-party servers. Onlin
 
 ---
 
-## Use Cases
+## v1.5 Single Source Lab
+
+v1.5 adds staged single-source validation to verify the complete Legado / ReadEra book source access chain:
+
+```
+search → bookInfo → toc → content
+```
+
+### New Capabilities
+
+| Capability | Description |
+|-----------|-------------|
+| **Staged chain validation** | Automatically extracts real bookUrl from search results → fetches book info → TOC → content with real URL linking |
+| **Item-scope rule execution** | Executes sub-rules inside each search result and TOC chapter element |
+| **Scoped pipeline** | Supports `.name@href`, `a@href`, `img@src`, `.title@text`, `@href`, `@text` and other selector+getter combinations |
+| **JSON search results** | Supports JSONPath bookList (e.g., `$.data[*]`) and shorthand field names (e.g., `name` → `$.name`) |
+| **POST searchUrl** | Supports `url,{"method":"POST","body":"searchkey={{key}}"}` format |
+| **Manual redirect handling** | Follows redirects hop-by-hop with per-hop SSRF re-check (max 5 hops) |
+| **Failure classification** | `ssrf_blocked` / `http_timeout` / `network_error` / `http_403` / `cloudflare_detected` / `empty_response` |
+| **Structured traces** | Per-stage `NetworkTrace` (URL / method / status / responseSize / bodyPreview / error) and `RuleTrace` |
+| **Debug UI** | Web GUI "🐛 Single Source Debug" page showing search results table, TOC table, content preview, and network request details |
+
+### How to Use
+
+Single-source debugging is accessed through the **Web GUI** "🐛 Single Source Debug" page:
+
+1. Start backend and frontend (`pnpm gui` + `pnpm web:dev`)
+2. Open `http://127.0.0.1:5173`, click "🐛 单源调试" in the left nav
+3. Paste a book source JSON, optionally enter a search keyword, and click "开始调试"
+
+> ⚠️ v1.5 does not add new CLI commands for single-source debugging. `process --online` remains the batch processing entry point. For deep single-source debugging, use the Web GUI.
+
+### Current Limitations
+
+| Limitation | Description |
+|-----------|-------------|
+| `webView:true` | Not supported — requires Browser Runner |
+| `java.ajax` | Not executed in safe mode |
+| `java.getCookie` | Not supported |
+| `Packages.*` | Not supported |
+| Rhino compatibility | Not fully simulated |
+| Login flow | Not handled |
+| Cloudflare / CAPTCHA | No bypass attempted |
+| Complex Legado-specific syntax | May require manual review |
+
+### Correct Positioning
+
+> v1.5 is not a full replacement for the Legado Android runtime. It is an automated validation tool for batch maintenance and single-source debugging. It is designed to catch structural errors, connection failures, rule breakage, and obviously broken sources — then defer complex sources for manual review.
 
 - Maintaining large book source collections (hundreds to thousands)
 - Periodic source cleaning and deduplication

@@ -12,6 +12,7 @@ import { registerProcessRoutes } from './routes/process.js';
 import { registerFilesRoutes } from './routes/files.js';
 import { registerJobsRoutes } from './routes/jobs.js';
 import { registerResultsRoutes } from './routes/results.js';
+import { registerDebugRoutes } from './routes/debug.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || '5178', 10);
@@ -92,6 +93,7 @@ registerProcessRoutes(app);
 registerFilesRoutes(app);
 registerJobsRoutes(app);
 registerResultsRoutes(app);
+registerDebugRoutes(app);
 
 // Start
 try {

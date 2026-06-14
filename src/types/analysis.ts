@@ -85,6 +85,26 @@ export interface SourceAnalysis {
   loginRelated: boolean;
   loginStatus: 'none' | 'loginRelated' | 'needsLogin' | 'loginMaybeRequired';
 
+  /** Rule verification (Phase 2 — optional) */
+  ruleVerifySearchStatus?: string;
+  ruleVerifySearchDetail?: string;
+  ruleVerifySearchResultCount?: number;
+
+  ruleVerifyBookInfoStatus?: string;
+  ruleVerifyBookInfoDetail?: string;
+
+  ruleVerifyTocStatus?: string;
+  ruleVerifyTocDetail?: string;
+  ruleVerifyTocResultCount?: number;
+
+  ruleVerifyContentStatus?: string;
+  ruleVerifyContentDetail?: string;
+
+  /** Overall rule verification outcome */
+  ruleVerificationPassed?: boolean;
+  ruleVerificationSummary?: string;
+  ruleVerificationDuration?: number;
+
   /** Final availability */
   availability: AvailabilityStatus;
 

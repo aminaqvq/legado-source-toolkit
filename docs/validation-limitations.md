@@ -38,3 +38,46 @@ Sources with non-HTTP `bookSourceUrl` (custom identifiers) are marked as `NON_HT
 2. Review `forbidden` sources manually — they often work with app's WebView
 3. `complex_unverified` sources may be fine; test in-app
 4. Use `--concurrency 3` for conservative checking to avoid rate-limiting
+
+---
+
+## Single Source Lab Limitations (v1.5)
+
+The Single Source Lab (`verifyAllRules` / Web GUI "单源调试") provides deeper validation than `--online`, but still has important limitations:
+
+### Unsupported Runtime Features
+
+| Feature | Status | Why |
+|---------|--------|-----|
+| **`webView:true`** | Not supported | Requires Android WebView to render JS-rendered pages; no Node.js equivalent available |
+| **`java.ajax`** | Blocked by default | Opens arbitrary HTTP connections from within JS rules; security risk in automated tools |
+| **`java.getCookie`** | Not supported | Requires browser session state / cookie jar |
+| **`java.put` / `java.get`** | Partially supported | `@put` / `@get` variable mapping works; `java.put` / `java.get` in JS blocks are not executed |
+| **`Packages.*` imports** | Not supported | Requires Android JVM classpath (e.g., `Packages.java.security`) |
+| **Rhino engine** | Not simulated | Node.js uses `vm.Script` sandbox with limited globals; many Legado-specific Rhino APIs are absent |
+
+### Unsupported Network Behavior
+
+| Scenario | Handling |
+|----------|----------|
+| **Cloudflare / CAPTCHA** | Detected and reported as `cloudflare_detected`; no bypass attempted |
+| **Login-gated content** | Detected via error page patterns; reported as `needs_login` or `empty_response` |
+| **Dynamic JS-rendered content** | Not accessible — page must be server-rendered HTML or pure JSON API |
+| **Rate limiting (HTTP 429)** | Detected as `http_timeout` or `network_error` depending on status code |
+
+### Not Implemented Yet
+
+- **Browser Runner**: full Playwright/Puppeteer integration for JS-rendered pages
+- **Android Runner**: running rules inside the actual Android Legado runtime
+- **Login session manager**: automated cookie / token management for protected sources
+- **Full Rhino compatibility mode**: safe emulation of all Legado Java APIs
+
+### What Works Well
+
+- Simple HTML sources with CSS/XPath/JSONPath rules
+- JSON API sources with JSONPath selectors
+- `selector@href` / `@text` scoped pipeline patterns
+- POST search requests
+- Redirect chains with SSRF protection
+- Content length validation (detecting too-short responses)
+- Structured error classification and suggestions

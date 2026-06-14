@@ -94,3 +94,34 @@ export const apiValidate = validate;
 export const apiProcess = startProcess;
 export const apiGetJob = getJob;
 export const apiGetResults = getResultsList;
+
+// ── Debug ──
+export async function debugSource(
+  source: Record<string, unknown>,
+  keyword?: string,
+  timeout?: number,
+): Promise<{
+  sourceName: string; sourceUrl: string; allPassed: boolean;
+  totalDuration: number; summary: string;
+  stages: Array<{
+    status: string; stage: string; url?: string;
+    responseSize?: number; resultCount?: number;
+    resultSample?: string; duration: number; error?: string; logs: string[];
+  }>;
+}> {
+  return post('/debug', { source, keyword, timeout });
+}
+
+export async function debugSingleStage(
+  source: Record<string, unknown>,
+  stage: 'search' | 'bookInfo' | 'toc' | 'content',
+  url?: string,
+  keyword?: string,
+  timeout?: number,
+): Promise<{
+  status: string; stage: string; url?: string;
+  responseSize?: number; resultCount?: number;
+  resultSample?: string; duration: number; error?: string; logs: string[];
+}> {
+  return post('/debug/stage', { source, stage, url, keyword, timeout });
+}

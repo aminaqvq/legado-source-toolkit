@@ -12,8 +12,9 @@ import NameCleaningPage from './pages/NameCleaningPage';
 import UrlNormalizationPage from './pages/UrlNormalizationPage';
 import ConsistencyPage from './pages/ConsistencyPage';
 import AuditCenter from './AuditCenter';
+import DebugPage from './pages/DebugPage';
 
-type Page = 'dashboard'|'upload'|'inspect'|'process'|'results'|'sources'|'duplicates'|'namecleaning'|'urlnormalization'|'consistency'|'audit';
+type Page = 'dashboard'|'upload'|'inspect'|'process'|'results'|'sources'|'duplicates'|'namecleaning'|'urlnormalization'|'consistency'|'audit'|'debug';
 
 const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
   { page: 'dashboard', label: '首页', icon: '🏠' },
@@ -27,6 +28,7 @@ const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
   { page: 'urlnormalization', label: 'URL 规范化', icon: '🔗' },
   { page: 'consistency', label: '验收中心', icon: '✅' },
   { page: 'audit', label: '审计中心', icon: '📋' },
+  { page: 'debug', label: '单源调试', icon: '🐛' },
 ];
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -89,6 +91,7 @@ function App() {
         {currentPage === 'urlnormalization' && <UrlNormalizationPage />}
         {currentPage === 'consistency' && <ConsistencyPage />}
         {currentPage === 'audit' && <AuditCenter />}
+        {currentPage === 'debug' && <DebugPage />}
       </main>
     </div>
   );

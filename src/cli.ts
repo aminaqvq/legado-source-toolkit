@@ -268,4 +268,63 @@ program
     heading(`Output: ${outDir}`);
   });
 
+// ── debug ──
+program
+  .command('debug')
+  .description('单源调试：逐步验证书源的搜索→详情→目录→正文规则')
+  .argument('<input>', '包含书源的 JSON 文件路径（取第一个源；多个源可加 --index）')
+  .option('-k, --keyword <word>', '搜索关键词（默认使用 ruleSearch.checkKeyWord 或 "斗破苍穹"）')
+  .option('-i, --index <n>', '调试输入文件中的第几个源（0-based），默认 0', '0')
+  .option('-f, --format <fmt>', '输出格式: json | detailed | summary', 'detailed')
+  .option('--timeout <ms>', '请求超时毫秒', '10000')
+  .action(async (input: string, options: Record<string, string>) => {
+    const { verifyAllRules } = await import('./core/verify-rules.js');
+    const { readBookSources } = await import('./core/parse.js');
+    const srcIdx = parseInt(options.index || '0', 10);
+
+    const { sources } = readBookSources(input);
+    if (sources.length === 0) {
+      console.error('Error: no book sources found in input');
+      process.exit(1);
+    }
+
+    if (srcIdx >= sources.length) {
+      console.error(`Error: index ${srcIdx} out of range (${sources.length} sources)`);
+      process.exit(1);
+    }
+
+    const source = sources[srcIdx];
+    const keyword = options.keyword || undefined;
+    const timeout = parseInt(options.timeout || '10000', 10);
+    const fmt = options.format || 'detailed';
+
+    console.log(`🐛 Debugging: ${source.bookSourceName || '(unnamed)'}`);
+    console.log(`   URL: ${source.bookSourceUrl}`);
+    console.log(`   Keyword: ${keyword || '(auto)'}`);
+    console.log('');
+
+    const result = await verifyAllRules(source, { keyword, timeout });
+
+    if (fmt === 'summary') {
+      console.log(result.summary);
+    } else if (fmt === 'detailed') {
+      for (const step of result.stages) {
+        const icon = step.status === 'RULE_VERIFIED' ? '✅' : step.status === 'RULE_SKIPPED' ? '⏭️ ' : step.status === 'RULE_NOT_CHECKED' ? '⊘' : '❌';
+        console.log(`${icon} [${step.stage}] ${step.status}`);
+        if (step.url) console.log(`   URL: ${step.url}`);
+        if (step.error) console.log(`   Error: ${step.error}`);
+        if (step.resultSample) console.log(`   Sample: ${step.resultSample}`);
+        if (step.resultCount !== undefined) console.log(`   Count: ${step.resultCount}`);
+        if (step.responseSize) console.log(`   Size: ${step.responseSize} bytes`);
+        console.log(`   Duration: ${step.duration}ms`);
+        console.log('');
+      }
+      console.log(`⏱ Total: ${result.totalDuration}ms`);
+      console.log(`📊 ${result.summary}`);
+    } else {
+      // JSON format
+      console.log(JSON.stringify(result, null, 2));
+    }
+  });
+
 program.parse();

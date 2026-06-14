@@ -32,3 +32,7 @@ Thumbs.db
 .codegraph/
 .reasonix/
 reasonix.toml
+
+# ── Debug artifacts ──
+debug_kt_decoded.txt
+nul

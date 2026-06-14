@@ -11,6 +11,16 @@ export { checkSearchUrl } from './core/validate-search.js';
 export { calculateScore } from './core/score.js';
 export { dedupeSources } from './core/dedupe.js';
 export { splitByCategory } from './core/split.js';
+export { verifyAllRules, verifyRuleSearch } from './core/verify-rules.js';
+
+// ── Rule Engine (Phase 1 & 2) ──
+export {
+  executeRule,
+  resolveSearchUrl,
+  parseRuleString,
+  executeJs,
+} from './core/rule-engine/index.js';
+export type { RuleResult, RuleVerifyDetail, VerifyAllResult, ResolvedUrl } from './core/rule-engine/types.js';
 
 // ── Types ──
 export type { BookSource, RuleSearch, RuleBookInfo, RuleToc, RuleContent } from './types/book-source.js';
