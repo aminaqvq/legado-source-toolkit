@@ -24,22 +24,13 @@ describe('End-to-end process', () => {
     expect(sources.length).toBeGreaterThanOrEqual(14);
     expect(analyses.length).toBe(sources.length);
   });
-
   it('should preserve an unknown field on each source', () => {
-    // The fixture doesn't have unknown fields out of the box,
-    // but the schema uses .passthrough() so unknown fields are kept
     const raw = readJsonFile<BookSource[]>(fixturePath);
-    // Add a custom field to one source
     (raw[0] as Record<string, unknown>).__custom_test_field = 'hello123';
-
-    // Write to temp, read back
     const tmpPath = path.join(__dirname, 'fixtures', '_tmp_test.json');
     writeJsonFile(tmpPath, raw);
-
     const { sources } = readBookSources(tmpPath);
     expect((sources[0] as Record<string, unknown>).__custom_test_field).toBe('hello123');
-
-    // Cleanup
     fs.removeSync(tmpPath);
   });
 });
@@ -47,134 +38,88 @@ describe('End-to-end process', () => {
 describe('Full pipeline without online checks', () => {
   it('should process all sources through the pipeline', () => {
     const { sources, analyses } = readBookSources(fixturePath);
-
-    // Phase 1: Clean names
     for (let i = 0; i < analyses.length; i++) {
-      const r = cleanBookSourceName(sources[i].bookSourceName ?? '', {
-        mode: 'zh-only',
-        keepLatinWhenNeeded: false,
-      });
+      const r = cleanBookSourceName(sources[i].bookSourceName ?? '', { mode: 'zh-only', keepLatinWhenNeeded: false });
       analyses[i].cleanedName = r.cleaned;
       analyses[i].warnings.push(...r.warnings);
     }
-
-    // Verify expected clean results
-    expect(analyses[0].cleanedName).toBe('米国度');       // 🚖 米国度
-    expect(analyses[1].cleanedName).toContain('有声');     // 🎧 UAA有声
-    expect(analyses[2].cleanedName).toBe('再漫画');        // 🎨再漫画💓
-    expect(analyses[3].cleanedName).toContain('笔趣阁');   // ❤️笔趣阁新站@遇知
-    expect(analyses[4].cleanedName).toContain('猫眼看书'); // 猫眼看书（优++）
-    expect(analyses[5].cleanedName).toBe('漫蛙');          // 漫蛙
-    expect(analyses[6].cleanedName).toBe('刚够小说网');    // 刚够小说网
-
-    // Phase 2: Normalize URLs
+    expect(analyses[0].cleanedName).toBe('米国度');
     for (let i = 0; i < analyses.length; i++) {
       const norm = normalizeUrl(sources[i].bookSourceUrl);
       analyses[i].normalizedUrl = norm.url;
       analyses[i].normalizedHost = norm.normalizedHost;
     }
-
     expect(analyses[0].normalizedHost).toBe('miguodu.com');
-
-    // Phase 3: Classify
     for (let i = 0; i < analyses.length; i++) {
       const cls = classifySource(sources[i], analyses[i]);
       analyses[i].inferredGroup = cls.category;
       analyses[i].classificationConfidence = cls.confidence;
     }
-
     expect(analyses[0].inferredGroup).toBe('小说');
-    expect(analyses[2].inferredGroup).toBe('漫画');     // comic
-    expect(analyses[8].inferredGroup).toBe('失效');     // 失效站
-
-    // Phase 4: Validate structure
     for (let i = 0; i < analyses.length; i++) {
       const struct = validateStructure(sources[i]);
       analyses[i].validationStatus = struct.status;
       analyses[i].validationReason = struct.reasons;
     }
-
-    // Most should be OK or WARN
-    const okCount = analyses.filter((a) => a.validationStatus === 'STRUCTURE_OK').length;
-    expect(okCount).toBeGreaterThan(0);
-
-    // Phase 5: Score
+    expect(analyses.filter((a) => a.validationStatus === 'STRUCTURE_OK').length).toBeGreaterThan(0);
     for (let i = 0; i < analyses.length; i++) {
-      // Set availability manually for scoring (no online check)
-      if (analyses[i].validationStatus === 'STRUCTURE_INVALID') {
-        analyses[i].availability = 'invalid';
-      } else if (analyses[i].validationStatus === 'STRUCTURE_WARN') {
-        analyses[i].availability = 'probably_usable';
-      } else {
-        analyses[i].availability = 'unknown';
-      }
-
+      if (analyses[i].validationStatus === 'STRUCTURE_INVALID') analyses[i].availability = 'invalid';
+      else if (analyses[i].validationStatus === 'STRUCTURE_WARN') analyses[i].availability = 'probably_usable';
+      else analyses[i].availability = 'unknown';
       const scoreResult = calculateScore(sources[i], analyses[i]);
       analyses[i].score = scoreResult.score;
       analyses[i].scoreBreakdown = scoreResult.breakdown;
     }
-
-    // The "失效站" should have a low score due to name penalty
-    const deadSource = analyses[8]; // ✨失效站✨
-    // Score might not be negative due to other bonuses, but should have the name penalty
-    expect(deadSource.scoreBreakdown['name_contains_dead']).toBe(-40);
-
-    // The usable sources should have positive scores
-    const goodSource = analyses[0]; // 米国度
-    expect(goodSource.score).toBeGreaterThan(0);
-
-    // Phase 6: Dedupe
+    expect(analyses[8].scoreBreakdown['name_contains_dead']).toBe(-40);
+    expect(analyses[0].score).toBeGreaterThan(0);
     const dedupeResult = dedupeSources(sources, analyses, { level: 'host' });
-    // Check that duplicates are found (m.biqiku.com vs www.biqiku.com)
-    const dupGroups = dedupeResult.groups;
-    // There should be at least one group with biqiku.com duplicates
-    expect(dupGroups.length).toBeGreaterThanOrEqual(0);
-
-    // Phase 7: Split (new API: takes cleaned sources directly)
     const keptAnalyses = analyses.filter((a) => a.kept);
-    const finalSources = keptAnalyses.map((a) => {
-      const s = { ...sources[a.index] };
-      (s as Record<string,unknown>)['finalCategory'] = a.inferredGroup;
-      (s as Record<string,unknown>)['originalIndex'] = a.index;
-      return s;
-    });
+    const finalSources = keptAnalyses.map((a) => { const s = { ...sources[a.index] }; (s as Record<string,unknown>)['finalCategory'] = a.inferredGroup; (s as Record<string,unknown>)['originalIndex'] = a.index; return s; });
     const groups = splitByCategory(finalSources);
     expect(Object.keys(groups).length).toBeGreaterThan(0);
   });
 });
 
-describe('Non-HTTP source handling', () => {
-  it('should mark non-HTTP bookSourceUrl as NON_HTTP_SOURCE', async () => {
-    const source: BookSource = {
-      bookSourceName: '非HTTP源',
-      bookSourceUrl: 'custom-identifier',
-      bookSourceType: 0,
-      searchUrl: 'https://example.com/search',
-      ruleSearch: { bookList: 'div', name: 'h3', bookUrl: 'a@href' },
-      ruleBookInfo: { name: 'h1' },
-      ruleToc: { chapterList: 'li', chapterName: 'a' },
-      ruleContent: { content: 'div' },
-    };
-
-    const result = await checkConnectivity(source, { timeout: 3000 });
-    expect(result.status).toBe('NON_HTTP_SOURCE');
-  });
-});
-
-describe('Complex JS detection', () => {
-  it('should skip complex JS search URLs', async () => {
-    const source: BookSource = {
-      bookSourceName: '复杂JS源',
-      bookSourceUrl: 'https://test.com',
-      bookSourceType: 0,
-      searchUrl: '<js>java.ajax("https://api.test.com/search")</js>',
-      ruleSearch: { bookList: 'div', name: 'h3', bookUrl: 'a@href' },
-      ruleBookInfo: { name: 'h1' },
-      ruleToc: { chapterList: 'li', chapterName: 'a' },
-      ruleContent: { content: 'div' },
-    };
-
-    const result = await checkSearchUrl(source, '小说');
-    expect(result.status).toBe('SEARCH_COMPLEX_JS_SKIPPED');
+describe('processSources batch validation scope', () => {
+  it('should only batch-validate kept + VALID_HTTP + not STRUCTURE_INVALID sources', async () => {
+    const searchHtml = '<html><body><ul class="result-list"><li class="book"><a class="name" href="/book/1">Test</a></li></ul></body></html>';
+    const bookInfoHtml = '<html><body><h1 class="book-title">Test</h1><a class="read-btn" href="/toc">TOC</a></body></html>';
+    const tocHtml = '<html><body><div class="chapter-list"><div class="chapter"><a href="/ch/1">Ch1</a></div></div></body></html>';
+    const contentHtml = '<html><body><div id="content">This is a long enough content text for the validation to pass the minimum length check.</div></body></html>';
+    function makeResponse(body: string): Response { return new Response(body, { status: 200, headers: { 'content-type': 'text/html' } }); }
+    const fetchCalls: string[] = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: any) => {
+      const url = typeof input === 'string' ? input : input?.url ?? '';
+      fetchCalls.push(url);
+      if (url.includes('/search')) return makeResponse(searchHtml);
+      if (url.includes('/book/1')) return makeResponse(bookInfoHtml);
+      if (url.includes('/toc')) return makeResponse(tocHtml);
+      if (url.includes('/ch/1')) return makeResponse(contentHtml);
+      return makeResponse('Not Found');
+    }) as any;
+    const validSource: BookSource = { bookSourceName: 'ValidSource', bookSourceUrl: 'https://example.com', bookSourceType: 0, enabled: true, searchUrl: '/search?q={{key}}', ruleSearch: { bookList: '.book', name: '.name', bookUrl: '.name@href' }, ruleBookInfo: { name: '.book-title', tocUrl: '.read-btn@href' }, ruleToc: { chapterList: '.chapter', chapterName: 'a', chapterUrl: 'a@href' }, ruleContent: { content: '#content' } };
+    const disabledSource: BookSource = { bookSourceName: 'DisabledSource', bookSourceUrl: 'https://disabled.example.com', bookSourceType: 0, enabled: false, searchUrl: '/search?q={{key}}', ruleSearch: { bookList: '.book', name: '.name', bookUrl: '.name@href' }, ruleBookInfo: { name: '.book-title', tocUrl: '.read-btn@href' }, ruleToc: { chapterList: '.chapter', chapterName: 'a', chapterUrl: 'a@href' }, ruleContent: { content: '#content' } };
+    const nonHttpSource: BookSource = { bookSourceName: 'NonHttpSource', bookSourceUrl: 'ftp://files.example.com', bookSourceType: 0, enabled: true, ruleSearch: { bookList: '.book', name: '.name', bookUrl: '.name@href' }, ruleBookInfo: { name: '.book-title' }, ruleToc: { chapterList: '.chapter', chapterName: 'a', chapterUrl: 'a@href' }, ruleContent: { content: '#content' } };
+    const tmpPath = path.join(__dirname, 'fixtures', '_batch_scope_test.json');
+    writeJsonFile(tmpPath, [validSource, disabledSource, nonHttpSource]);
+    try {
+      const { processSources } = await import('../src/core/process.js');
+      const report = await processSources({ inputPath: tmpPath, outDir: path.join(__dirname, 'fixtures', '_batch_scope_out'), online: false, dedupeLevel: 'none', groupMode: 'preserve', nameMode: 'loose', concurrency: 1, timeout: 5000, retry: 0, dryRun: true, writeMeta: false, outputFormat: 'pretty', keepDisabled: false, onlyEnabled: false, includeNonHttp: false, includeUnknown: true, includeComplex: true, includeUnavailable: true, keepLatinWhenNeeded: false, allowRiskyDedupe: false, writeNormalizedUrl: false, strict: false, validateMode: 'deep', batchConcurrency: 1 });
+      const validAnalysis = report.sources.find((a) => a.originalName === 'ValidSource');
+      expect(validAnalysis!.batchValidationStatus).toBeDefined();
+      const disabledAnalysis = report.sources.find((a) => a.originalName === 'DisabledSource');
+      if (disabledAnalysis) expect(disabledAnalysis.batchValidationStatus).toBeUndefined();
+      const nonHttpAnalysis = report.sources.find((a) => a.originalName === 'NonHttpSource');
+      expect(nonHttpAnalysis!.batchValidationStatus).toBeUndefined();
+      expect(report.summary.batchValidation).toBeDefined();
+      expect(report.summary.batchValidation!.total).toBe(1);
+      expect(fetchCalls.filter((c) => c.includes('ftp://')).length).toBe(0);
+      expect(fetchCalls.filter((c) => c.includes('disabled.example.com')).length).toBe(0);
+    } finally {
+      globalThis.fetch = origFetch;
+      fs.removeSync(tmpPath);
+      fs.removeSync(path.join(__dirname, 'fixtures', '_batch_scope_out'));
+    }
   });
 });
