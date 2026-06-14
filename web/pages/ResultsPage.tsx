@@ -36,7 +36,6 @@ export default function ResultsPage() {
         </div>
       )}
 
-      {/* Show current result first if available */}
       {activeOutput && (
         <div key={activeOutput.name} className="result-item" style={{ marginTop: 16, padding: 16, background: 'var(--card-bg)', border: '2px solid #3b82f6', borderRadius: 8 }}>
           <h3>⭐ {activeOutput.name} (当前)</h3>
@@ -67,12 +66,45 @@ export default function ResultsPage() {
 function ResultSummary({ summary }: { summary: ProcessSummary | undefined }) {
   if (!summary) return null;
   return (
-    <div className="summary-cards" style={{ margin: '12px 0' }}>
-      <StatCard label="输入总数" value={summary.input?.total ?? '-'} color="gray" />
-      <StatCard label="输出总数" value={summary.output?.total ?? '-'} color="green" />
-      <StatCard label="去重移除" value={summary.removed?.duplicateCount ?? 0} color="yellow" />
-      <StatCard label="不可用排除" value={summary.removed?.unavailableCount ?? 0} color="orange" />
-      <StatCard label="结构无效" value={summary.validation?.invalidCount ?? 0} color="red" />
+    <div>
+      <div className="summary-cards" style={{ margin: '12px 0' }}>
+        <StatCard label="输入总数" value={summary.input?.total ?? '-'} color="gray" />
+        <StatCard label="输出总数" value={summary.output?.total ?? '-'} color="green" />
+        <StatCard label="去重移除" value={summary.removed?.duplicateCount ?? 0} color="yellow" />
+        <StatCard label="不可用排除" value={summary.removed?.unavailableCount ?? 0} color="orange" />
+        <StatCard label="结构无效" value={summary.validation?.invalidCount ?? 0} color="red" />
+      </div>
+      {summary.batchValidation && (
+        <div style={{ marginTop: 16 }}>
+          <h4 style={{ margin: '0 0 8px' }}>🔬 批量深度校验</h4>
+          <div className="summary-cards" style={{ margin: '0 0 12px' }}>
+            <StatCard label="校验总数" value={summary.batchValidation.total} color="gray" />
+            <StatCard label="PASS" value={summary.batchValidation.pass} color="green" />
+            <StatCard label="Partial Pass" value={summary.batchValidation.partialPass} color="blue" />
+            <StatCard label="Fail" value={summary.batchValidation.fail} color="red" />
+            <StatCard label="Blocked" value={summary.batchValidation.blocked} color="orange" />
+            <StatCard label="Unsupported" value={summary.batchValidation.unsupported} color="purple" />
+            <StatCard label="Needs Login" value={summary.batchValidation.needsLogin} color="yellow" />
+          </div>
+          {Object.keys(summary.batchValidation.byFailureReason).length > 0 && (
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ cursor: 'pointer', color: '#4a90d9', fontSize: '0.85rem' }}>
+                ⚠ 失败原因分布
+              </summary>
+              <div style={{ marginTop: 4, padding: 8, background: '#f8f9fa', borderRadius: 4, fontSize: '0.78rem', maxHeight: 200, overflowY: 'auto' }}>
+                {Object.entries(summary.batchValidation.byFailureReason)
+                  .sort(([,a],[,b]) => b - a)
+                  .map(([reason, count]) => (
+                    <div key={reason} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0', borderBottom: '1px solid #eee' }}>
+                      <span><code>{reason}</code></span>
+                      <span style={{ fontWeight: 600 }}>{count}</span>
+                    </div>
+                  ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
     </div>
   );
 }

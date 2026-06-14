@@ -1,19 +1,13 @@
-// ── API wrapper ──
-
 export interface ApiResponse<T> {
   success: boolean;
   data: T;
   error?: { code: string; message: string };
 }
 
-// ── Health ──
-
 export interface HealthData {
   status: string;
   version: string;
 }
-
-// ── Inspect ──
 
 export interface InspectData {
   total: number;
@@ -25,8 +19,6 @@ export interface InspectData {
   emojiCount: number;
 }
 
-// ── Job ──
-
 export interface JobStatus {
   id: string;
   status: 'pending' | 'running' | 'success' | 'failed';
@@ -35,7 +27,6 @@ export interface JobStatus {
   completedAt?: string;
   result?: unknown;
   error?: string;
-  // ── Structured progress ──
   logs?: string[];
   phase?: string;
   totalProgress?: number;
@@ -46,8 +37,6 @@ export interface JobStatus {
   displayResultDir?: string;
   inputPath?: string;
 }
-
-// ── Process options ──
 
 export interface ProcessFormOptions {
   inputPath: string;
@@ -72,8 +61,6 @@ export interface ProcessFormOptions {
   strict: boolean;
 }
 
-// ── Summary ──
-
 export interface ZoneStats {
   total: number;
   categoryCounts: Record<string, number>;
@@ -87,9 +74,8 @@ export interface ProcessSummary {
   output: ZoneStats & { averageRespondTime: number; measuredAverageRespondTime: number | null };
   removed: { duplicateCount: number; unavailableCount: number; riskyCount: number };
   validation: { okCount: number; warnCount: number; invalidCount: number };
+  batchValidation?: BatchValidationSummary;
 }
-
-// ── Consistency ──
 
 export interface ConsistencyCheck {
   id: string;
@@ -107,8 +93,6 @@ export interface ConsistencyReport {
   checks: ConsistencyCheck[];
   summary: { dirtyNamesInGroups: number; groupFieldMismatches: number; cleanedGroupsDiffs: number };
 }
-
-// ── Issues ──
 
 export interface DirtyNameItem {
   file: string;
@@ -177,8 +161,6 @@ export interface IssuesData {
   risky: unknown[];
 }
 
-// ── Source detail ──
-
 export interface ClassificationSignal {
   fromType: string | null;
   fromName: string[];
@@ -227,8 +209,6 @@ export interface SourceAnalysisItem {
   risks: string[];
 }
 
-// ── Upload ──
-
 export interface UploadResult {
   uploadId: string;
   path: string;
@@ -245,7 +225,21 @@ export interface UploadPreview {
   preview: Record<string, unknown>[];
 }
 
-// ── Results list ──
+export interface BatchValidationSummary {
+  total: number;
+  pass: number;
+  partialPass: number;
+  fail: number;
+  blocked: number;
+  needsLogin: number;
+  unsupported: number;
+  risky: number;
+  unknown: number;
+  byFailureReason: Record<string, number>;
+  byHost: Record<string, number>;
+  byGroup: Record<string, number>;
+  bySourceType: Record<string, number>;
+}
 
 export interface ResultsListEntry {
   name: string;

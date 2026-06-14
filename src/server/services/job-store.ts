@@ -4,21 +4,19 @@ interface Job {
   createdAt: string;
   completedAt?: string;
   progress?: string;
-  // ── Structured progress fields ──
   logs: string[];
   phase: string;
-  /** Absolute output directory (internal use only) */
   resultDir: string;
-  /** Relative output directory for frontend display */
   displayResultDir: string;
   inputPath: string;
-  // ── Progress tracking ──
   totalProgress: number;
   phaseProgress: number;
   connDone: number;
   connTotal: number;
   searchDone: number;
   searchTotal: number;
+  batchDone: number;
+  batchTotal: number;
   result?: unknown;
   error?: string;
 }
@@ -38,7 +36,7 @@ class JobStore {
       id, status: 'pending', createdAt: new Date().toISOString(),
       logs: [], phase: '', resultDir: '', displayResultDir: '', inputPath: '',
       totalProgress: 0, phaseProgress: 0,
-      connDone: 0, connTotal: 0, searchDone: 0, searchTotal: 0,
+      connDone: 0, connTotal: 0, searchDone: 0, searchTotal: 0, batchDone: 0, batchTotal: 0,
     };
     this.jobs.set(id, job);
     this.expireOld();
@@ -65,14 +63,13 @@ class JobStore {
     if (job) { job.phase = phase; job.progress = phase; job.logs.push(`▶ ${phase}`); }
   }
 
-  /** Update structured progress — called by onProgress callback. */
-  updateProgress(id: string, label: 'connectivity' | 'search', done: number, total: number): void {
+  updateProgress(id: string, label: 'connectivity' | 'search' | 'batch', done: number, total: number): void {
     const job = this.jobs.get(id);
     if (!job) return;
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
     if (label === 'connectivity') { job.connDone = done; job.connTotal = total; }
-    else { job.searchDone = done; job.searchTotal = total; }
-    // Estimate totalProgress: conn+search together are ~40% of overall when online
+    else if (label === 'search') { job.searchDone = done; job.searchTotal = total; }
+    else if (label === 'batch') { job.batchDone = done; job.batchTotal = total; }
     job.phaseProgress = percent;
     job.totalProgress = Math.min(99, 50 + Math.round(percent * 0.4));
   }

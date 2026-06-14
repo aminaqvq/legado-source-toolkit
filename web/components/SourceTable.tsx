@@ -21,6 +21,12 @@ const DEFAULT_COLS: Column[] = [
   { key: 'kept', label: '保留' },
 ];
 
+const BATCH_COLS: Column[] = [
+  { key: 'batchValidationMode', label: '校验模式' },
+  { key: 'batchValidationStatus', label: '最终状态' },
+  { key: 'firstFailureStage', label: '首次失败' },
+];
+
 export default function SourceTable({ sources, onSelect, loading }: Props) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<1 | -1>(1);
@@ -39,6 +45,9 @@ export default function SourceTable({ sources, onSelect, loading }: Props) {
   const totalPages = Math.ceil(sorted.length / pageSize);
   const pageSlice = sorted.slice(page * pageSize, (page + 1) * pageSize);
 
+  const hasBatch = sources.some((s) => s.batchValidationStatus != null);
+  const cols = hasBatch ? [...DEFAULT_COLS, ...BATCH_COLS] : DEFAULT_COLS;
+
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir(d => (d * -1) as 1 | -1);
     else { setSortKey(key); setSortDir(1); }
@@ -54,7 +63,7 @@ export default function SourceTable({ sources, onSelect, loading }: Props) {
         <table>
           <thead>
             <tr>
-              {DEFAULT_COLS.map(c => (
+              {cols.map(c => (
                 <th key={c.key} onClick={c.sortable ? () => toggleSort(c.key) : undefined}
                   style={c.sortable ? { cursor: 'pointer' } : {}}>
                   {c.label} {sortKey === c.key ? (sortDir === 1 ? '↑' : '↓') : ''}
@@ -73,6 +82,13 @@ export default function SourceTable({ sources, onSelect, loading }: Props) {
                 <td><StatusBadge status={String(s.validationStatus || '')} size="sm" /></td>
                 <td>{String(s.score ?? '')}</td>
                 <td><StatusBadge status={s.kept ? 'ok' : 'fail'} size="sm" /></td>
+                {hasBatch && (
+                  <>
+                    <td>{String(s.batchValidationMode || '')}</td>
+                    <td><StatusBadge status={String(s.batchValidationStatus || '')} size="sm" /></td>
+                    <td>{truncate(String(s.firstFailureStage || ''), 20)}</td>
+                  </>
+                )}
               </tr>
             ))}
           </tbody>
